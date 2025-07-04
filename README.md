@@ -1,2 +1,2 @@
 # GARDIAN
-GARDIAN: Community-Driven AI for Sustainable Drainage &amp; Waste Management Utilizing YOLO
+    GARDIAN: Community-Driven AI for Sustainable Drainage & Waste Management Utilizing YOLO
