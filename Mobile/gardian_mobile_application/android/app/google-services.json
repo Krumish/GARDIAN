@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "976234026245",
+    "project_id": "gardian-2d7e5",
+    "storage_bucket": "gardian-2d7e5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:976234026245:android:1a943dd35d9240265ed36c",
+        "android_client_info": {
+          "package_name": "com.example.gardian_mobile_application"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCe6GOQ7NZi7rG0x35l5UZ8L0-HNGzqlo0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
