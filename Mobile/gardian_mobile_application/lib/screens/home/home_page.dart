@@ -3,11 +3,9 @@ import '../../services/auth_services.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
   @override
   Widget build(BuildContext context) {
     final user = authService.value.currentUser;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Home'),

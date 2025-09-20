@@ -10,6 +10,9 @@ class AuthService {
 
   Stream<User?> get authStateChages => firebaseAuth.authStateChanges();
 
+  // -------------------
+  // Existing methods
+  // -------------------
   Future<UserCredential> signIn({
     required String email,
     required String password,
@@ -66,5 +69,59 @@ class AuthService {
     );
     await currentUser!.reauthenticateWithCredential(credential);
     await currentUser!.updatePassword(newPassword);
+  }
+
+  // -------------------
+  // NEW: Phone OTP methods
+  // -------------------
+
+  /// Step 1: Send OTP
+  Future<void> sendOtp({
+    required String phoneNumber,
+    required Function(String verificationId) codeSent,
+    required Function(String error) onError,
+  }) async {
+    await firebaseAuth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (PhoneAuthCredential credential) {
+        // You can auto-link here if you want, but usually ignored
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        onError(e.message ?? "Phone verification failed");
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        codeSent(verificationId);
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        // Not strictly needed
+      },
+    );
+  }
+
+  /// Step 2: Verify OTP and link email/password
+  Future<void> verifyOtpAndRegister({
+    required String verificationId,
+    required String smsCode,
+    required String email,
+    required String password,
+  }) async {
+    final phoneCred = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+
+    // Sign in with phone number first
+    final phoneUser = await firebaseAuth.signInWithCredential(phoneCred);
+
+    // Link email/password to same account
+    final emailCred = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
+    await phoneUser.user!.linkWithCredential(emailCred);
+
+    // Sign out after registration (optional, keeps your old flow)
+    await signOut();
   }
 }
