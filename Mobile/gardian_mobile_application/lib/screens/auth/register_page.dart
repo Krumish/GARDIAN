@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_services.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -13,6 +14,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _smsController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _barangayController = TextEditingController();
 
   String? _verificationId;
   bool _codeSent = false;
@@ -51,12 +54,26 @@ class _RegisterPageState extends State<RegisterPage> {
 
     setState(() => _isLoading = true);
     try {
-      await authService.value.verifyOtpAndRegister(
+      // Step 1: Verify OTP & register (Auth)
+      final userCred = await authService.value.verifyOtpAndRegister(
         verificationId: _verificationId!,
         smsCode: _smsController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // Step 2: Save to Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCred.user!.uid)
+          .set({
+            'email': _emailController.text.trim(),
+            'phone': _phoneController.text.trim(),
+            'fullName': _nameController.text.trim(),
+            'barangay': _barangayController.text.trim(),
+            'role': 'user', // default role
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -76,11 +93,21 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Register')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Full Name'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _barangayController,
+              decoration: const InputDecoration(labelText: 'Barangay'),
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(labelText: 'Email'),

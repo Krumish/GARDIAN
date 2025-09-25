@@ -100,7 +100,7 @@ class AuthService {
   }
 
   /// Step 2: Verify OTP and link email/password
-  Future<void> verifyOtpAndRegister({
+  Future<UserCredential> verifyOtpAndRegister({
     required String verificationId,
     required String smsCode,
     required String email,
@@ -121,7 +121,7 @@ class AuthService {
     );
     await phoneUser.user!.linkWithCredential(emailCred);
 
-    // Sign out after registration (optional, keeps your old flow)
-    await signOut();
+    // Return the user credential so caller can use it
+    return phoneUser;
   }
 }
