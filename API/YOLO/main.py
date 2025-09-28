@@ -1,23 +1,27 @@
 from fastapi import FastAPI, UploadFile, File
-from ultralytics import YOLO
 from fastapi.responses import JSONResponse
-import shutil, os
+from ultralytics import YOLO
+import shutil, os, base64, cv2
 
 app = FastAPI()
-model = YOLO("yolov8n.pt")   # later replace with "best.pt" after training
+model = YOLO("yolov8n.pt")  # replace with your custom trained weights if you have them
 
 @app.post("/detect/")
 async def detect(file: UploadFile = File(...)):
+    # Save temporary file
     file_path = f"temp_{file.filename}"
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Run YOLO detection
     results = model(file_path)
-    os.remove(file_path)
 
     persons = 0
     benches = 0
     boxes = []
+
+    # Annotated image (with bounding boxes)
+    annotated_image = results[0].plot()  # numpy array with drawings
 
     for r in results:
         for box in r.boxes:
@@ -36,13 +40,22 @@ async def detect(file: UploadFile = File(...)):
                 "box": xyxy
             })
 
+    # Decide status
     status = "Empty"
     if persons > 0 and benches > 0:
         status = "Full" if persons >= benches else "Partially Full"
+
+    # Convert annotated image to base64
+    _, buffer = cv2.imencode(".jpg", annotated_image)
+    encoded_image = base64.b64encode(buffer).decode("utf-8")
+
+    # Remove temp file
+    os.remove(file_path)
 
     return JSONResponse({
         "person_count": persons,
         "bench_count": benches,
         "status": status,
-        "boxes": boxes
+        "boxes": boxes,
+        "annotated_image": encoded_image  # 🔹 Flutter will decode this
     })
