@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import "leaflet/dist/leaflet.css";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import ReportChart from "./components/ReportChart";

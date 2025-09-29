@@ -1,3 +1,5 @@
+
+import React, { useEffect } from "react";
 import { FaClock, FaExclamationTriangle } from "react-icons/fa";
 import { MdTrendingUp, MdLocationOn } from "react-icons/md";
 import { Bar, Line } from "react-chartjs-2";
@@ -13,6 +15,11 @@ import {
   LineElement,
 } from "chart.js";
 
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet.heat"; 
+
 ChartJS.register(
   Title,
   Tooltip,
@@ -24,30 +31,72 @@ ChartJS.register(
   LineElement
 );
 
+/** HeatmapLayer*/
+function HeatmapLayer({ points }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+   
+    const heatData = points.map((p) => [p.coords[0], p.coords[1], p.severity / 5]);
+
+    const heat = L.heatLayer(heatData, {
+      radius: 50,
+      blur: 15,
+      maxZoom: 15,
+    
+      gradient: {
+        0.2: "green",
+        0.5: "orange",
+        1.0: "red",
+      },
+    }).addTo(map);
+
+    const legend = window.L.control({ position: "bottomright" });
+
+    legend.onAdd = function () {
+      const div = window.L.DomUtil.create("div", "info legend");
+      const grades = ["Low", "Moderate", "High", "Very High"];
+      const colors = ["green", "yellow", "orange", "red"];
+
+      let labels = "<h4>Severity</h4>";
+      grades.forEach((grade, i) => {
+        labels += `
+          <i style="background:${colors[i]}; width:18px; height:18px; display:inline-block; margin-right:6px;"></i>
+          ${grade}<br>`;
+      });
+
+      div.innerHTML = labels;
+      return div;
+    };
+
+    legend.addTo(map);
+
+    return () => {
+      map.removeLayer(heat);
+      legend.remove();
+    };
+  }, [map, points]);
+
+  return null;
+}
+
 export default function Analytics() {
-  // Heatmap sample data
+ 
   const areas = [
-    { name: "San Andres", reports: 120, severity: 5 },
-    { name: "San Roque", reports: 120, severity: 5 },
-    { name: "San Isidro", reports: 47, severity: 2 },
-    { name: "Sto. Niño", reports: 20, severity: 2 },
-    { name: "Halang", reports: 95, severity: 4 },
-    { name: "Sto. Domingo", reports: 85, severity: 3 },
-    { name: "San Juan", reports: 60, severity: 2 },
-    { name: "Sta. Rosa", reports: 32, severity: 1 },
-    { name: "Karangalan", reports: 87, severity: 3 },
-    { name: "Balanti", reports: 24, severity: 1 },
+    { name: "San Andres", reports: 120, severity: 5, coords: [14.5789, 121.1247] },
+    { name: "San Roque", reports: 95, severity: 4, coords: [14.5805, 121.1200] },
+    { name: "San Isidro", reports: 47, severity: 3, coords: [14.5840, 121.1168] },
+    { name: "Sto. Niño", reports: 20, severity: 2, coords: [14.5901, 121.1212] },
+    { name: "Sto. Domingo", reports: 85, severity: 3, coords: [14.5930, 121.1270] },
+    { name: "San Juan", reports: 60, severity: 2, coords: [14.5865, 121.1105] },
+    { name: "Sta. Rosa", reports: 32, severity: 1, coords: [14.5825, 121.1325] },
+    { name: "Karangalan", reports: 87, severity: 4, coords: [14.5890, 121.1350] },
+    { name: "Balanti", reports: 24, severity: 1, coords: [14.5755, 121.1300] },
+    { name: "Halang", reports: 95, severity: 5, coords: [14.5885, 121.1405] },
   ];
 
-  const severityColors = {
-    5: "bg-red-400",
-    4: "bg-orange-400",
-    3: "bg-yellow-400",
-    2: "bg-green-400",
-    1: "bg-green-300",
-  };
-
-  // Line chart (Issue trends)
   const issueTrendData = {
     labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
     datasets: [
@@ -72,7 +121,6 @@ export default function Analytics() {
     ],
   };
 
-  // Bar chart (Reports vs Barangay)
   const barangayData = {
     labels: ["San Roque", "San Juan", "San Isidro", "Sto. Domingo", "San Andres"],
     datasets: [
@@ -95,68 +143,69 @@ export default function Analytics() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Analytics</h1>
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <span className="text-sm text-gray-500 mb-2">Avg. Resolution Time</span>
-          <div className="flex items-center gap-2">
-            <FaClock className="text-teal-500 text-xl" />
-            <p className="text-2xl font-bold">3.5 Days</p>
+      {/* Top Stats*/}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-4 rounded-lg shadow flex items-center">
+          <FaClock className="text-blue-500 text-3xl mr-3" />
+          <div>
+            <p className="text-sm text-gray-500">Avg. Response Time</p>
+            <p className="text-lg font-bold">35 mins</p>
           </div>
         </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <span className="text-sm text-gray-500 mb-2">Top Issue</span>
-          <div className="flex items-center gap-2">
-            <FaExclamationTriangle className="text-red-500 text-xl" />
-            <p className="text-2xl font-bold">Potholes (35%)</p>
+        <div className="bg-white p-4 rounded-lg shadow flex items-center">
+          <FaExclamationTriangle className="text-red-500 text-3xl mr-3" />
+          <div>
+            <p className="text-sm text-gray-500">Pending Issues</p>
+            <p className="text-lg font-bold">72</p>
           </div>
         </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <span className="text-sm text-gray-500 mb-2">Report Trend</span>
-          <div className="flex items-center gap-2">
-            <MdTrendingUp className="text-green-500 text-xl" />
-            <p className="text-2xl font-bold">+15%</p>
+        <div className="bg-white p-4 rounded-lg shadow flex items-center">
+          <MdTrendingUp className="text-green-500 text-3xl mr-3" />
+          <div>
+            <p className="text-sm text-gray-500">Resolved This Month</p>
+            <p className="text-lg font-bold">128</p>
           </div>
         </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <span className="text-sm text-gray-500 mb-2">High-Risk Areas</span>
-          <div className="flex items-center gap-2">
-            <MdLocationOn className="text-orange-500 text-xl" />
-            <p className="text-lg font-bold">San Andres, Sto. Domingo</p>
+        <div className="bg-white p-4 rounded-lg shadow flex items-center">
+          <MdLocationOn className="text-purple-500 text-3xl mr-3" />
+          <div>
+            <p className="text-sm text-gray-500">Barangays Covered</p>
+            <p className="text-lg font-bold">10</p>
           </div>
         </div>
       </div>
 
-      {/* Heatmap of Problem Areas */}
+      {/* Heatmap of Problem Areas (map only) */}
       <div className="bg-white p-6 rounded-xl shadow">
         <h2 className="text-lg font-semibold mb-4">Heatmap of Problem Areas</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {areas.map((area, idx) => (
-            <div
-              key={idx}
-              className={`p-4 rounded-lg shadow text-white ${severityColors[area.severity]}`}
-            >
-              <p className="font-bold">{area.name}</p>
-              <p className="text-sm">Total: {area.reports}</p>
-              <p className="text-xs mt-2">Severity: {area.severity}</p>
-            </div>
-          ))}
-        </div>
+
+        <MapContainer
+          center={[14.5885, 121.125]} // center around Cainta
+          zoom={13}
+          className="w-full h-96 rounded-lg shadow-md"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/">OSM</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <HeatmapLayer points={areas} />
+        </MapContainer>
       </div>
 
       {/* Bottom Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow h-80">
-          <h2 className="text-lg font-semibold mb-4">Issue Trends by Type</h2>
-          <Line data={issueTrendData} options={chartOptions} />
+        <div className="bg-white p-6 rounded-xl shadow">
+          <h2 className="text-lg font-semibold mb-4">Issue Trends</h2>
+          <div className="h-80">
+            <Line data={issueTrendData} options={chartOptions} />
+          </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow h-80">
-          <h2 className="text-lg font-semibold mb-4">Total Reports vs. Barangay</h2>
-          <Bar data={barangayData} options={chartOptions} />
+        <div className="bg-white p-6 rounded-xl shadow">
+          <h2 className="text-lg font-semibold mb-4">Reports by Barangay</h2>
+          <div className="h-80">
+            <Bar data={barangayData} options={chartOptions} />
+          </div>
         </div>
       </div>
     </div>
