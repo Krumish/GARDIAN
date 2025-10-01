@@ -11,6 +11,8 @@ class StorageService {
   Future<void> uploadUserImage(
     File file, {
     Map<String, dynamic>? yoloResults,
+    double? lat,
+    double? lng,
   }) async {
     final uid = authService.value.currentUser?.uid;
     if (uid == null) throw Exception("Not logged in");
@@ -27,7 +29,7 @@ class StorageService {
     // Get download URL
     final url = await ref.getDownloadURL();
 
-    // Save metadata + YOLO results in Firestore
+    // Save metadata + YOLO results + location in Firestore
     await _firestore
         .collection("users")
         .doc(uid)
@@ -37,6 +39,8 @@ class StorageService {
           "url": url,
           "uploadedAt": FieldValue.serverTimestamp(),
           "yolo": yoloResults ?? {},
+          "latitude": lat,
+          "longitude": lng,
         });
   }
 
