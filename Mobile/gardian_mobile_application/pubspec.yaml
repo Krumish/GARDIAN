@@ -20,6 +20,7 @@ dependencies:
   location: ^8.0.1
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.6
+  pinput: ^5.0.2
 
 flutter_launcher_icons:
   android: "launcher_icon"
@@ -42,3 +43,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icons/GARDIAN.png
+    - assets/icons/GARDIAN_LOGO.png
+    - assets/icons/GARDIAN_TEXT.png
