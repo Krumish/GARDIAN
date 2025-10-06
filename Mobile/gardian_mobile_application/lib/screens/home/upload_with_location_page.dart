@@ -82,8 +82,8 @@ class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
           Expanded(
             child: GoogleMap(
               initialCameraPosition: const CameraPosition(
-                target: LatLng(14.5995, 120.9842), // Manila default
-                zoom: 14,
+                target: LatLng(14.5806, 121.1157), // Manila default
+                zoom: 15,
               ),
               onTap: (LatLng pos) {
                 setState(() => selectedLocation = pos);

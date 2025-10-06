@@ -39,10 +39,22 @@ class ReportHistory extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final data = uploads[index].data() as Map<String, dynamic>;
                   final url = data['url'] as String?;
-                  final status = data['status'] ?? "Pending";
-                  final location = data['location'] ?? "Unknown";
                   final reportId = uploads[index].id;
 
+                  // 🔹 Report status (manual workflow)
+                  final status = data['status'] ?? "Pending";
+
+                  // 🔹 YOLO detection results
+                  final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
+                  final persons = yolo['person_count'] ?? 0;
+                  final benches = yolo['bench_count'] ?? 0;
+                  final detectionStatus = yolo['status'] ?? "Unknown";
+
+                  // 🔹 Location
+                  final lat = data['latitude'];
+                  final lng = data['longitude'];
+
+                  // Status color
                   Color statusColor;
                   switch (status) {
                     case "In Progress":
@@ -62,7 +74,7 @@ class ReportHistory extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsets.only(bottom: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -83,6 +95,7 @@ class ReportHistory extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // 🔹 Workflow status badge
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -101,12 +114,30 @@ class ReportHistory extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
+
+                              // 🔹 YOLO detection info
                               Text(
-                                location,
+                                "Detected: $persons person(s), $benches bench(es)",
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              Text(
+                                "Bench Status: $detectionStatus",
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+
+                              // 🔹 Location
+                              if (lat != null && lng != null)
+                                Text(
+                                  "Location: ($lat, $lng)",
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+
+                              // 🔹 Report ID
                               Text(
                                 "#$reportId",
                                 style: const TextStyle(
