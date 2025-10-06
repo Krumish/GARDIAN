@@ -10,9 +10,6 @@ class AuthService {
 
   Stream<User?> get authStateChages => firebaseAuth.authStateChanges();
 
-  // -------------------
-  // Existing methods
-  // -------------------
   Future<UserCredential> signIn({
     required String email,
     required String password,
@@ -71,11 +68,6 @@ class AuthService {
     await currentUser!.updatePassword(newPassword);
   }
 
-  // -------------------
-  // NEW: Phone OTP methods
-  // -------------------
-
-  /// Step 1: Send OTP
   Future<void> sendOtp({
     required String phoneNumber,
     required Function(String verificationId) codeSent,
@@ -84,9 +76,7 @@ class AuthService {
     await firebaseAuth.verifyPhoneNumber(
       phoneNumber: phoneNumber,
       timeout: const Duration(seconds: 60),
-      verificationCompleted: (PhoneAuthCredential credential) {
-        // You can auto-link here if you want, but usually ignored
-      },
+      verificationCompleted: (PhoneAuthCredential credential) {},
       verificationFailed: (FirebaseAuthException e) {
         onError(e.message ?? "Phone verification failed");
       },

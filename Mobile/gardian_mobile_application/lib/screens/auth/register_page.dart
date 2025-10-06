@@ -35,8 +35,8 @@ class _RegisterPageState extends State<RegisterPage> {
               verificationId: verificationId,
               email: _emailController.text.trim(),
               password: _passwordController.text.trim(),
-              fullName:
-                  "${_firstNameController.text.trim()} ${_lastNameController.text.trim()}",
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
               barangay: _barangayController.text.trim(),
               phone: _phoneController.text.trim(),
             ),

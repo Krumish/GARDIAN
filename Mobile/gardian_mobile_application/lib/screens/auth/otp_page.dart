@@ -7,7 +7,8 @@ class OtpPage extends StatefulWidget {
   final String verificationId;
   final String email;
   final String password;
-  final String fullName;
+  final String firstName;
+  final String lastName;
   final String barangay;
   final String phone;
 
@@ -16,7 +17,8 @@ class OtpPage extends StatefulWidget {
     required this.verificationId,
     required this.email,
     required this.password,
-    required this.fullName,
+    required this.firstName,
+    required this.lastName,
     required this.barangay,
     required this.phone,
   });
@@ -40,13 +42,17 @@ class _OtpPageState extends State<OtpPage> {
         password: widget.password,
       );
 
+      await userCred.user!.updateDisplayName("${widget.firstName}");
+      await userCred.user!.reload(); 
+
       await FirebaseFirestore.instance
           .collection("users")
           .doc(userCred.user!.uid)
           .set({
             "email": widget.email,
             "phone": widget.phone,
-            "fullName": widget.fullName,
+            "firstName": widget.firstName,
+            "lastName": widget.lastName,
             "barangay": widget.barangay,
             "role": "user",
             "createdAt": FieldValue.serverTimestamp(),
@@ -101,7 +107,7 @@ class _OtpPageState extends State<OtpPage> {
 
               const SizedBox(height: 30),
 
-              // 🔹 PIN INPUT
+              // PIN INPUT
               Pinput(
                 length: 6,
                 controller: _otpController,
