@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import '../../services/auth_services.dart';
 import '../../services/storage_service.dart';
+import '../../widgets/detection_review_dialog.dart';
 
 class UploadWithLocationPage extends StatefulWidget {
   const UploadWithLocationPage({super.key});
@@ -17,9 +17,11 @@ class UploadWithLocationPage extends StatefulWidget {
 class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
   LatLng? selectedLocation;
   File? _selectedImage;
-  bool _isUploading = false;
+  bool _isProcessing = false;
 
   Future<Map<String, dynamic>?> _sendToYoloServer(File file) async {
+    // for real phone
+    // final uri = Uri.parse("http://192.168.254.106:8000/detect/");
     final uri = Uri.parse("http://10.0.2.2:8000/detect/");
     final request = http.MultipartRequest("POST", uri);
     request.files.add(await http.MultipartFile.fromPath("file", file.path));
@@ -33,43 +35,52 @@ class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
     }
   }
 
-  Future<void> _pickImageAndUpload() async {
+  Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile == null) return;
-
-    setState(() {
-      _selectedImage = File(pickedFile.path);
-      _isUploading = true;
-    });
+    setState(() => _selectedImage = File(pickedFile.path));
 
     try {
-      // Step 1: YOLO detection
+      setState(() => _isProcessing = true);
+
+      // YOLO detection
       final yoloResults = await _sendToYoloServer(_selectedImage!);
+      if (!mounted) return;
 
-      // Step 2: Upload to Firebase
-      await storageService.uploadUserImage(
-        _selectedImage!,
-        yoloResults: yoloResults,
-        lat: selectedLocation?.latitude,
-        lng: selectedLocation?.longitude,
+      // Show modal (separate file)
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => DetectionReviewDialog(
+          yoloResults: yoloResults,
+          onConfirm: () async {
+            // Upload to Firebase
+            await storageService.uploadUserImage(
+              _selectedImage!,
+              yoloResults: yoloResults,
+              lat: selectedLocation?.latitude,
+              lng: selectedLocation?.longitude,
+            );
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Image uploaded successfully!")),
+              );
+              Navigator.pop(context); // go back home
+            }
+          },
+        ),
       );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Image uploaded successfully!")),
-        );
-        Navigator.pop(context); // back to home
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+        ).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     } finally {
-      setState(() => _isUploading = false);
+      setState(() => _isProcessing = false);
     }
   }
 
@@ -82,7 +93,7 @@ class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
           Expanded(
             child: GoogleMap(
               initialCameraPosition: const CameraPosition(
-                target: LatLng(14.5806, 121.1157), // Manila default
+                target: LatLng(14.5806, 121.1157),
                 zoom: 15,
               ),
               onTap: (LatLng pos) {
@@ -101,18 +112,16 @@ class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
           if (_selectedImage != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Image.file(_selectedImage!, height: 150),
+              child: Image.file(_selectedImage!, height: 100),
             ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton.icon(
-              onPressed: selectedLocation == null || _isUploading
+              onPressed: selectedLocation == null || _isProcessing
                   ? null
-                  : _pickImageAndUpload,
-              icon: const Icon(Icons.upload),
-              label: Text(
-                _isUploading ? "Uploading..." : "Select Image & Upload",
-              ),
+                  : _pickImage,
+              icon: const Icon(Icons.image),
+              label: Text(_isProcessing ? "Processing..." : "Select Image"),
             ),
           ),
         ],
