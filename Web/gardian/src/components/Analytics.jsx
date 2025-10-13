@@ -148,8 +148,8 @@ export default function Analytics() {
         <div className="bg-white p-4 rounded-lg shadow flex items-center">
           <FaClock className="text-blue-500 text-3xl mr-3" />
           <div>
-            <p className="text-sm text-gray-500">Avg. Response Time</p>
-            <p className="text-lg font-bold">35 mins</p>
+            <p className="text-sm text-gray-500">Avg. Resolution Days</p>
+            <p className="text-lg font-bold">3 Days</p>
           </div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow flex items-center">
