@@ -1,13 +1,13 @@
-
 import React, { useEffect } from "react";
 import { FaClock, FaExclamationTriangle } from "react-icons/fa";
 import { MdTrendingUp, MdLocationOn } from "react-icons/md";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Bar, Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   Title,
-  Tooltip,
-  Legend,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
   BarElement,
   CategoryScale,
   LinearScale,
@@ -18,12 +18,12 @@ import {
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet.heat"; 
+import "leaflet.heat";
 
 ChartJS.register(
   Title,
-  Tooltip,
-  Legend,
+  ChartTooltip,
+  ChartLegend,
   BarElement,
   CategoryScale,
   LinearScale,
@@ -31,21 +31,19 @@ ChartJS.register(
   LineElement
 );
 
-/** HeatmapLayer*/
+/** HeatmapLayer */
 function HeatmapLayer({ points }) {
   const map = useMap();
 
   useEffect(() => {
     if (!map) return;
 
-   
     const heatData = points.map((p) => [p.coords[0], p.coords[1], p.severity / 5]);
 
     const heat = L.heatLayer(heatData, {
       radius: 50,
       blur: 15,
       maxZoom: 15,
-    
       gradient: {
         0.2: "green",
         0.5: "orange",
@@ -83,7 +81,6 @@ function HeatmapLayer({ points }) {
 }
 
 export default function Analytics() {
- 
   const areas = [
     { name: "San Andres", reports: 120, severity: 5, coords: [14.5789, 121.1247] },
     { name: "San Roque", reports: 95, severity: 4, coords: [14.5805, 121.1200] },
@@ -121,29 +118,25 @@ export default function Analytics() {
     ],
   };
 
-  const barangayData = {
-    labels: ["San Roque", "San Juan", "San Isidro", "Sto. Domingo", "San Andres"],
-    datasets: [
-      {
-        label: "Reports",
-        data: [500, 1500, 1800, 2000, 3500],
-        backgroundColor: "rgba(33, 47, 80, 0.9)",
-        borderRadius: 6,
-      },
-    ],
-  };
-
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: true } },
   };
 
+  // New Report Status Distribution
+  const reportStatusData = [
+    { name: "Pending", value: 72 },
+    { name: "In Progress", value: 24 },
+    { name: "Resolved", value: 128 },
+  ];
+  const COLORS = ["#EF4444", "#eab308", "#10B981"]; // Yellow, Blue, Green
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Analytics</h1>
 
-      {/* Top Stats*/}
+      {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-4 rounded-lg shadow flex items-center">
           <FaClock className="text-blue-500 text-3xl mr-3" />
@@ -175,12 +168,11 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Heatmap of Problem Areas (map only) */}
+      {/* Heatmap of Problem Areas */}
       <div className="bg-white p-6 rounded-xl shadow">
         <h2 className="text-lg font-semibold mb-4">Heatmap of Problem Areas</h2>
-
         <MapContainer
-          center={[14.5885, 121.125]} // center around Cainta
+          center={[14.5885, 121.125]}
           zoom={13}
           className="w-full h-96 rounded-lg shadow-md"
         >
@@ -202,9 +194,27 @@ export default function Analytics() {
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow">
-          <h2 className="text-lg font-semibold mb-4">Reports by Barangay</h2>
+          <h2 className="text-lg font-semibold mb-4">Report Status Distribution</h2>
           <div className="h-80">
-            <Bar data={barangayData} options={chartOptions} />
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={reportStatusData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label
+                >
+                  {reportStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>

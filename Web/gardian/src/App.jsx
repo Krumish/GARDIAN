@@ -1,4 +1,3 @@
-// src/App.jsx
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
@@ -7,7 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 // Components
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-import ReportChart from "./components/ReportChart";
+import MonthlyReportChart from "./components/MonthlyReportChart";
 import Analytics from "./components/Analytics";
 import Reports from "./components/Reports";
 import CitizenFeedback from "./components/CitizenFeedback";
@@ -163,7 +162,7 @@ function Dashboard({ recentReports }) {
 
       {/* Chart */}
       <div className="p-6 bg-white rounded-xl shadow mb-6">
-        <ReportChart />
+        <MonthlyReportChart />
       </div>
 
       {/* Recent Reports Table */}
