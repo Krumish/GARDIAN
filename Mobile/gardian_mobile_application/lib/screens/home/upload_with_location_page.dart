@@ -20,7 +20,7 @@ class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
   bool _isProcessing = false;
 
   Future<Map<String, dynamic>?> _sendToYoloServer(File file) async {
-    // for real phone
+    // for real phone:
     // final uri = Uri.parse("http://192.168.254.106:8000/detect/");
     final uri = Uri.parse("http://10.0.2.2:8000/detect/");
     final request = http.MultipartRequest("POST", uri);
@@ -29,7 +29,9 @@ class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
     final response = await request.send();
     if (response.statusCode == 200) {
       final body = await response.stream.bytesToString();
-      return jsonDecode(body);
+      final decoded = jsonDecode(body);
+      debugPrint("✅ YOLO response: $decoded");
+      return decoded;
     } else {
       throw Exception("YOLO server error: ${response.statusCode}");
     }
@@ -45,35 +47,46 @@ class _UploadWithLocationPageState extends State<UploadWithLocationPage> {
     try {
       setState(() => _isProcessing = true);
 
-      // YOLO detection
+      // 🔹 YOLO detection
       final yoloResults = await _sendToYoloServer(_selectedImage!);
       if (!mounted) return;
 
-      // Show modal (separate file)
+      // 🔹 Show review dialog before uploading
       await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => DetectionReviewDialog(
-          yoloResults: yoloResults,
+          originalFile: _selectedImage!,
+          yolo: yoloResults ?? {},
           onConfirm: () async {
-            // Upload to Firebase
-            await storageService.uploadUserImage(
-              _selectedImage!,
-              yoloResults: yoloResults,
-              lat: selectedLocation?.latitude,
-              lng: selectedLocation?.longitude,
-            );
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Image uploaded successfully!")),
+            try {
+              await storageService.uploadUserImage(
+                _selectedImage!,
+                yoloResults: yoloResults,
+                lat: selectedLocation?.latitude,
+                lng: selectedLocation?.longitude,
               );
-              Navigator.pop(context); // go back home
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("✅ Image uploaded successfully!"),
+                  ),
+                );
+                Navigator.pop(context); // go back home
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+              }
             }
           },
         ),
       );
     } catch (e) {
+      debugPrint("🔥 YOLO error: $e");
       if (mounted) {
         ScaffoldMessenger.of(
           context,

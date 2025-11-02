@@ -41,13 +41,13 @@ class ReportHistory extends StatelessWidget {
                   final url = data['url'] as String?;
                   final reportId = uploads[index].id;
 
-                  // 🔹 Report status (manual workflow)
+                  // 🔹 Workflow status (manual workflow)
                   final status = data['status'] ?? "Pending";
 
                   // 🔹 YOLO detection results
                   final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
-                  final persons = yolo['person_count'] ?? 0;
-                  final benches = yolo['bench_count'] ?? 0;
+                  final drainages = yolo['drainage_count'] ?? 0;
+                  final obstructions = yolo['obstruction_count'] ?? 0;
                   final detectionStatus = yolo['status'] ?? "Unknown";
 
                   // 🔹 Location
@@ -117,13 +117,13 @@ class ReportHistory extends StatelessWidget {
 
                               // 🔹 YOLO detection info
                               Text(
-                                "Detected: $persons person(s), $benches bench(es)",
+                                "Detected: $drainages drainage(s), $obstructions obstruction(s)",
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               Text(
-                                "Bench Status: $detectionStatus",
+                                "Drainage Status: $detectionStatus",
                                 style: const TextStyle(color: Colors.black54),
                               ),
 
