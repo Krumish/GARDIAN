@@ -112,6 +112,14 @@ class StorageService {
         .orderBy("uploadedAt", descending: true)
         .snapshots();
   }
+
+  Future<String> uploadTempImage(File imageFile) async {
+    final ref = FirebaseStorage.instance.ref(
+      'temp_uploads/${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
+    await ref.putFile(imageFile);
+    return await ref.getDownloadURL();
+  }
 }
 
 final storageService = StorageService();
