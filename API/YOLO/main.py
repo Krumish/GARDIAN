@@ -4,8 +4,9 @@ from ultralytics import YOLO
 import shutil, os, base64, cv2
 
 app = FastAPI()
-model = YOLO("yolov8n.pt")  # replace with your custom trained weights if you have them
 
+# Load your custom drainage model
+model = YOLO("v3.pt") 
 @app.post("/detect/")
 async def detect(file: UploadFile = File(...)):
     # Save temporary file
@@ -16,8 +17,8 @@ async def detect(file: UploadFile = File(...)):
     # Run YOLO detection
     results = model(file_path)
 
-    persons = 0
-    benches = 0
+    drainage_count = 0
+    obstruction_count = 0
     boxes = []
 
     # Annotated image (with bounding boxes)
@@ -29,10 +30,13 @@ async def detect(file: UploadFile = File(...)):
             conf = float(box.conf)
             xyxy = box.xyxy[0].tolist()
 
-            if cls == "person":
-                persons += 1
-            if cls == "bench":
-                benches += 1
+            # Count Drainages
+            if cls.lower() == "drainages":
+                drainage_count += 1
+
+            # Count obstructions
+            if cls.lower() in ["trash", "leaves", "rocks", "silt", "cracks", "manhole"]:
+                obstruction_count += 1
 
             boxes.append({
                 "class": cls,
@@ -41,9 +45,11 @@ async def detect(file: UploadFile = File(...)):
             })
 
     # Decide status
-    status = "Empty"
-    if persons > 0 and benches > 0:
-        status = "Full" if persons >= benches else "Partially Full"
+    status = "Clear"
+    if obstruction_count > 0 and drainage_count > 0:
+        status = "Clogged"
+    elif obstruction_count > 0:
+        status = "Partially Blocked"
 
     # Convert annotated image to base64
     _, buffer = cv2.imencode(".jpg", annotated_image)
@@ -53,8 +59,8 @@ async def detect(file: UploadFile = File(...)):
     os.remove(file_path)
 
     return JSONResponse({
-        "person_count": persons,
-        "bench_count": benches,
+        "drainage_count": drainage_count,
+        "obstruction_count": obstruction_count,
         "status": status,
         "boxes": boxes,
         "annotated_image": encoded_image  # 🔹 Flutter will decode this
