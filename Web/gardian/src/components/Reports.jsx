@@ -1,56 +1,137 @@
-import { FaCheckCircle, FaSearch } from "react-icons/fa";
+import { useState, useEffect } from "react";
+import { FaCheckCircle, FaSearch, FaMapMarkerAlt, FaUser } from "react-icons/fa";
 import { RiHourglassFill } from "react-icons/ri";
-import { MdPending } from "react-icons/md";
-import { useState } from "react";
+import { MdPending, MdAssignment } from "react-icons/md";
+import { collectionGroup, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
+import { db, auth } from "../../firebase";
 
 export default function Reports() {
-  // Sample reports data (added images)
-  const [reports] = useState([
-    {
-      id: 1,
-      name: "Juan Del Herrera",
-      location: "San Roque",
-      date: "2025-09-01",
-      time: "10:30 AM",
-      assigned: "Officer Reyes",
-      status: "Pending",
-      type: "Pothole",
-      image: "https://via.placeholder.com/400x250.png?text=Pothole+Report",
-    },
-    {
-      id: 2,
-      name: "Maria Mendieta",
-      location: "San Juan",
-      date: "2025-09-02",
-      time: "02:15 PM",
-      assigned: "Officer Cruz",
-      status: "In Progress",
-      type: "Drainage",
-      image: "https://via.placeholder.com/400x250.png?text=Drainage+Report",
-    },
-    {
-      id: 3,
-      name: "Pedro Sy",
-      location: "San Andres",
-      date: "2025-09-03",
-      time: "09:45 AM",
-      assigned: "Officer Dizon",
-      status: "Resolved",
-      type: "Streetlight",
-      image: "https://via.placeholder.com/400x250.png?text=Streetlight+Report",
-    },
-  ]);
-
-  // Search filter
+  const [reports, setReports] = useState([]);
   const [search, setSearch] = useState("");
-  const [selectedReport, setSelectedReport] = useState(null); // for modal
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [showAssignModal, setShowAssignModal] = useState(null);
+  const [showStatusModal, setShowStatusModal] = useState(null);
+  const [officerName, setOfficerName] = useState("");
+  const [newStatus, setNewStatus] = useState("");
 
+  // Fetch all uploads across all users in real-time
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      console.error("❌ Cannot query - no authenticated user");
+      return;
+    }
+
+    const uploadsQuery = collectionGroup(db, "uploads");
+
+    const unsubscribe = onSnapshot(
+      uploadsQuery,
+      async (snapshot) => {
+        const allReports = await Promise.all(
+          snapshot.docs.map(async (uploadDoc) => {
+            const userId = uploadDoc.ref.parent.parent?.id || "unknown";
+            
+            // Fetch user details
+            let userDetails = null;
+            try {
+              const userDoc = await getDoc(doc(db, "users", userId));
+              if (userDoc.exists()) {
+                userDetails = userDoc.data();
+              }
+            } catch (err) {
+              console.error("Error fetching user details:", err);
+            }
+
+            return {
+              id: uploadDoc.id,
+              userId,
+              userDetails,
+              docRef: uploadDoc.ref,
+              ...uploadDoc.data(),
+            };
+          })
+        );
+        setReports(allReports);
+      },
+      (error) => {
+        console.error("❌ Error fetching uploads:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Determine infrastructure type based on yolo data
+  const getInfrastructureType = (report) => {
+    if (report.yolo?.drainage_count > 0) return "Drainage";
+    // Add more logic here for other types when available
+    return "Unknown";
+  };
+
+  // Filtered reports based on search
   const filteredReports = reports.filter(
     (r) =>
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.location.toLowerCase().includes(search.toLowerCase()) ||
-      r.type.toLowerCase().includes(search.toLowerCase())
+      (r.id || "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.userDetails?.firstName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.userDetails?.lastName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.userDetails?.barangay || "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.status || "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.assignedOfficer || "").toLowerCase().includes(search.toLowerCase()) ||
+      getInfrastructureType(r).toLowerCase().includes(search.toLowerCase())
   );
+
+  // Helper to format date
+  const formatDate = (ts) => {
+    if (!ts) return "-";
+    if (ts.toDate) {
+      const date = ts.toDate();
+      return date.toLocaleDateString();
+    }
+    return ts;
+  };
+
+  // Helper to format time
+  const formatTime = (ts) => {
+    if (!ts) return "-";
+    if (ts.toDate) {
+      const date = ts.toDate();
+      return date.toLocaleTimeString();
+    }
+    return ts;
+  };
+
+  // Assign officer to report
+  const handleAssignOfficer = async () => {
+    if (!showAssignModal || !officerName.trim()) return;
+    
+    try {
+      await updateDoc(showAssignModal.docRef, {
+        assignedOfficer: officerName,
+        status: "Assigned"
+      });
+      setShowAssignModal(null);
+      setOfficerName("");
+    } catch (err) {
+      console.error("Error assigning officer:", err);
+      alert("Failed to assign officer");
+    }
+  };
+
+  // Update report status
+  const handleUpdateStatus = async () => {
+    if (!showStatusModal || !newStatus) return;
+    
+    try {
+      await updateDoc(showStatusModal.docRef, {
+        status: newStatus
+      });
+      setShowStatusModal(null);
+      setNewStatus("");
+    } catch (err) {
+      console.error("Error updating status:", err);
+      alert("Failed to update status");
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -59,24 +140,20 @@ export default function Reports() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Total Reports</h3>
-          <p className="text-3xl font-bold mt-2">{reports.length}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Pending</h3>
+          <h3 className="text-sm text-gray-500">In Progress</h3>
           <div className="flex items-center mt-2 text-red-500">
-            <MdPending className="mr-2" />
+            <RiHourglassFill className="mr-2" />
             <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "Pending").length}
+              {reports.filter((r) => r.status === "In Progress").length}
             </p>
           </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">In Progress</h3>
-          <div className="flex items-center mt-2 text-yellow-500">
-            <RiHourglassFill className="mr-2" />
+          <h3 className="text-sm text-gray-500">Assigned</h3>
+          <div className="flex items-center mt-2 text-orange-500">
+            <MdAssignment className="mr-2" />
             <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "In Progress").length}
+              {reports.filter((r) => r.status === "Assigned").length}
             </p>
           </div>
         </div>
@@ -89,6 +166,10 @@ export default function Reports() {
             </p>
           </div>
         </div>
+        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+          <h3 className="text-sm text-gray-500">Total Reports</h3>
+          <p className="text-3xl font-bold mt-2">{reports.length}</p>
+        </div>
       </div>
 
       {/* Reports Section */}
@@ -96,7 +177,7 @@ export default function Reports() {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">All Reports</h2>
 
-          {/* Search with icon */}
+          {/* Search */}
           <div className="relative w-full sm:w-1/3">
             <FaSearch className="absolute left-3 top-3 text-gray-400" />
             <input
@@ -122,45 +203,105 @@ export default function Reports() {
                 <th className="py-3 px-4">Time</th>
                 <th className="py-3 px-4">Assigned Officer</th>
                 <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredReports.map((report) => (
                 <tr
                   key={report.id}
-                  className="border-b hover:bg-gray-50 text-sm cursor-pointer"
-                  onClick={() => setSelectedReport(report)} // open modal
+                  className="border-b hover:bg-gray-50 text-sm"
                 >
-                  <td className="py-3 px-4">{report.id}</td>
-                  <td className="py-3 px-4">{report.name}</td>
-                  <td className="py-3 px-4">{report.type}</td>
-                  <td className="py-3 px-4">{report.location}</td>
-                  <td className="py-3 px-4">{report.date}</td>
-                  <td className="py-3 px-4">{report.time}</td>
-                  <td className="py-3 px-4">{report.assigned}</td>
                   <td className="py-3 px-4">
-                    {report.status === "Pending" && (
-                      <span className="text-red-500 flex items-center">
-                        <MdPending className="mr-1" /> Pending
+                    <button
+                      className="font-mono text-xs text-gray-700 hover:text-blue-600 underline"
+                      onClick={() => alert(`Full Report ID:\n${report.id}`)}
+                    >
+                      {report.id.substring(0, 8)}...
+                    </button>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center">
+                      <FaUser className="text-gray-400 mr-2 text-xs" />
+                      <div>
+                        <div className="font-medium">
+                          {report.userDetails?.firstName} {report.userDetails?.lastName}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="text-gray-700 text-xs font-medium">
+                      {getInfrastructureType(report)}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center">
+                      <FaMapMarkerAlt className="text-gray-400 mr-1 text-xs" />
+                      {report.userDetails?.barangay || "-"}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-xs">
+                    {formatDate(report.uploadedAt)}
+                  </td>
+                  <td className="py-3 px-4 text-xs">
+                    {formatTime(report.uploadedAt)}
+                  </td>
+                  <td className="py-3 px-4">
+                    {report.assignedOfficer ? (
+                      <span className="text-blue-600 font-medium">
+                        {report.assignedOfficer}
                       </span>
+                    ) : (
+                      <button
+                        className="text-gray-400 hover:text-blue-500 text-xs underline"
+                        onClick={() => setShowAssignModal(report)}
+                      >
+                        Assign Officer
+                      </button>
                     )}
-                    {report.status === "In Progress" && (
-                      <span className="text-yellow-500 flex items-center">
-                        <RiHourglassFill className="mr-1" /> In Progress
-                      </span>
-                    )}
-                    {report.status === "Resolved" && (
-                      <span className="text-green-500 flex items-center">
-                        <FaCheckCircle className="mr-1" /> Resolved
-                      </span>
-                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    <button
+                      className="flex items-center cursor-pointer"
+                      onClick={() => setShowStatusModal(report)}
+                    >
+                      {report.status === "Pending" && (
+                        <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                          <MdPending className="mr-1" /> Pending
+                        </span>
+                      )}
+                      {report.status === "Assigned" && (
+                        <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                          <MdAssignment className="mr-1" /> Assigned
+                        </span>
+                      )}
+                      {report.status === "In Progress" && (
+                        <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                          <RiHourglassFill className="mr-1" /> In Progress
+                        </span>
+                      )}
+                      {report.status === "Resolved" && (
+                        <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                          <FaCheckCircle className="mr-1" /> Resolved
+                        </span>
+                      )}
+                    </button>
+                  </td>
+                  <td className="py-3 px-4">
+                    <button
+                      className="bg-blue-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-blue-600 transition"
+                      onClick={() => setSelectedReport(report)}
+                    >
+                      View
+                    </button>
                   </td>
                 </tr>
               ))}
               {filteredReports.length === 0 && (
                 <tr>
                   <td
-                    colSpan="8"
+                    colSpan="9"
                     className="text-center py-4 text-gray-500 italic"
                   >
                     No reports found.
@@ -172,29 +313,246 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Modal for report preview */}
-      {selectedReport && (
+      {/* Assign Officer Modal */}
+      {showAssignModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 relative">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">Assign Officer</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Report ID: {showAssignModal.id.substring(0, 12)}...
+            </p>
+            <input
+              type="text"
+              placeholder="Enter officer name"
+              className="border border-gray-300 rounded-lg px-4 py-2 w-full mb-4"
+              value={officerName}
+              onChange={(e) => setOfficerName(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
+                onClick={() => {
+                  setShowAssignModal(null);
+                  setOfficerName("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                onClick={handleAssignOfficer}
+              >
+                Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Status Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">Update Status</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Report ID: {showStatusModal.id.substring(0, 12)}...
+            </p>
+            <p className="text-sm text-gray-600 mb-4">
+              Current Status: <span className="font-semibold">{showStatusModal.status}</span>
+            </p>
+            <select
+              className="border border-gray-300 rounded-lg px-4 py-2 w-full mb-4"
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+            >
+              <option value="">Select new status</option>
+              <option value="Pending">Pending</option>
+              <option value="Assigned">Assigned</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+            <div className="flex gap-2">
+              <button
+                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
+                onClick={() => {
+                  setShowStatusModal(null);
+                  setNewStatus("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                onClick={handleUpdateStatus}
+              >
+                Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Details Modal */}
+      {selectedReport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 relative">
             <button
-              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl"
               onClick={() => setSelectedReport(null)}
             >
               ✕
             </button>
-            <h3 className="text-xl font-bold mb-2">
-              Report #{selectedReport.id} - {selectedReport.type}
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Reported by {selectedReport.name} from{" "}
-              {selectedReport.location} on {selectedReport.date} at{" "}
-              {selectedReport.time}
-            </p>
-            <img
-              src={selectedReport.image}
-              alt={selectedReport.type}
-              className="rounded-lg border border-gray-200"
-            />
+            
+            <h3 className="text-2xl font-bold mb-4">Report Details</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column - Info */}
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
+                    <FaUser className="mr-2" /> Reporter Information
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Name:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedReport.userDetails?.firstName} {selectedReport.userDetails?.lastName}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Phone:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedReport.userDetails?.phone}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Email:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedReport.userDetails?.email || "-"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Barangay:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedReport.userDetails?.barangay}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-700 mb-3">
+                    📍 Location
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Latitude:</span>
+                      <span className="ml-2 font-mono text-xs">
+                        {selectedReport.latitude?.toFixed(6)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Longitude:</span>
+                      <span className="ml-2 font-mono text-xs">
+                        {selectedReport.longitude?.toFixed(6)}
+                      </span>
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps?q=${selectedReport.latitude},${selectedReport.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-2 bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
+                    >
+                      View on Map
+                    </a>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-700 mb-3">
+                    🔍 Detection Results
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Type:</span>
+                      <span className="ml-2 font-medium">
+                        {getInfrastructureType(selectedReport)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Drainage Status:</span>
+                      <span className={`ml-2 font-bold ${selectedReport.yolo?.status === "Clogged" ? "text-red-600" : "text-green-600"}`}>
+                        {selectedReport.yolo?.status || "-"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Drainages Detected:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedReport.yolo?.drainage_count || 0}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Obstructions Found:</span>
+                      <span className="ml-2 font-medium text-orange-600">
+                        {selectedReport.yolo?.obstruction_count || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-700 mb-3">
+                    📋 Report Status
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Status:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedReport.status}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Assigned Officer:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedReport.assignedOfficer || "Not assigned"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Date:</span>
+                      <span className="ml-2 text-xs">
+                        {formatDate(selectedReport.uploadedAt)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Time:</span>
+                      <span className="ml-2 text-xs">
+                        {formatTime(selectedReport.uploadedAt)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Images */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold text-gray-700 mb-3">
+                    📷 Report Image
+                  </h4>
+                  {selectedReport.url ? (
+                    <img
+                      src={selectedReport.url}
+                      alt="Report"
+                      className="rounded-lg border border-gray-200 w-full"
+                    />
+                  ) : (
+                    <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-400">
+                      No image available
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
