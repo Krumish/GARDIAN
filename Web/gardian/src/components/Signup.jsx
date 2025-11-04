@@ -1,73 +1,114 @@
 import { useState } from "react";
 import { auth, db } from "../../firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("user");
-  const [message, setMessage] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      // Create a dummy password account to generate uid
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        "TemporaryPassword123!"
-      );
-      const uid = userCredential.user.uid;
 
-      // Save user to Firestore using UID (required by your rules)
-      await setDoc(doc(db, "users", uid), {
+    try {
+      // Create user
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Store admin info in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        fullName,
         email,
-        role,
-        createdAt: serverTimestamp(),
+        phone,
+        role: "admin",
+        createdAt: new Date(),
       });
 
-      setMessage(`✅ User created successfully as ${role}`);
-      setEmail("");
-    } catch (error) {
-      setMessage("❌ " + error.message);
+      alert("Admin account created successfully!");
+      navigate("/login");
+    } catch (err) {
+      console.error(err);
+      alert("Signup failed: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-[#F5EEDD]">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center text-[#06202B]">
-          Temporary Signup
-        </h2>
+    <div className="min-h-screen flex items-center justify-center bg-[#213547] text-white">
+      <div className="bg-white text-gray-900 rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center mb-6 text-[#213547]">
+          Create Admin Account
+        </h1>
+
         <form onSubmit={handleSignup} className="space-y-4">
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full border p-2 rounded-md"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full border p-2 rounded-md"
-          >
-            <option value="admin">Admin</option>
-          </select>
+          <div>
+            <label className="block mb-1 font-medium">Full Name</label>
+            <input
+              type="text"
+              className="w-full p-2 border rounded-lg"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Email</label>
+            <input
+              type="email"
+              className="w-full p-2 border rounded-lg"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Phone Number (+63...)</label>
+            <input
+              type="tel"
+              className="w-full p-2 border rounded-lg"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Password</label>
+            <input
+              type="password"
+              className="w-full p-2 border rounded-lg"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
           <button
             type="submit"
-            className="w-full bg-[#077A7D] text-white py-2 rounded-md hover:bg-[#06202B]"
             disabled={loading}
+            className={`w-full py-2 rounded-lg text-white transition ${
+              loading ? "bg-gray-400" : "bg-[#213547] hover:bg-[#1a2b3d]"
+            }`}
           >
             {loading ? "Creating..." : "Sign Up"}
           </button>
         </form>
-        {message && <p className="mt-4 text-center text-sm">{message}</p>}
+
+        <p className="text-sm text-center mt-4">
+          Already have an account?{" "}
+          <Link to="/login" className="text-[#213547] font-semibold hover:underline">
+            Log in
+          </Link>
+        </p>
       </div>
     </div>
   );
