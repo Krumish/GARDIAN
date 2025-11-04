@@ -12,6 +12,8 @@
   "dependencies": {
     "chart.js": "^4.5.0",
     "firebase": "^12.4.0",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
     "maplibre-gl": "^5.7.3",
