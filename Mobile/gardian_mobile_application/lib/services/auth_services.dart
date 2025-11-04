@@ -74,7 +74,7 @@ class AuthService {
     required Function(String error) onError,
   }) async {
     await firebaseAuth.verifyPhoneNumber(
-      phoneNumber: phoneNumber,
+      phoneNumber: '+63${phoneNumber.replaceAll(' ', '')}',
       timeout: const Duration(seconds: 60),
       verificationCompleted: (PhoneAuthCredential credential) {},
       verificationFailed: (FirebaseAuthException e) {

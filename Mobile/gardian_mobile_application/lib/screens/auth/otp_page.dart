@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pinput/pinput.dart';
 import '../../services/auth_services.dart';
+import 'register_page.dart';
 
 class OtpPage extends StatefulWidget {
   final String verificationId;
@@ -42,8 +43,8 @@ class _OtpPageState extends State<OtpPage> {
         password: widget.password,
       );
 
-      await userCred.user!.updateDisplayName("${widget.firstName}");
-      await userCred.user!.reload(); 
+      await userCred.user!.updateDisplayName(widget.firstName);
+      await userCred.user!.reload();
 
       await FirebaseFirestore.instance
           .collection("users")
@@ -90,47 +91,72 @@ class _OtpPageState extends State<OtpPage> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Image.asset("assets/icons/mail.png", height: 120),
+              // 🔙 Back Button
+              Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegisterPage()),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 120),
+
+              // 📨 Icon / Illustration
+              Center(child: Image.asset("assets/icons/otp.png", height: 120)),
               const SizedBox(height: 20),
 
-              const Text(
-                "Enter confirmation code",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              const Center(
+                child: Text(
+                  "Enter confirmation code",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
               const SizedBox(height: 5),
-              const Text(
-                "A 6-digit code was sent to your phone number",
-                style: TextStyle(color: Colors.black54),
+              const Center(
+                child: Text(
+                  "A 6-digit code was sent to your phone number",
+                  style: TextStyle(color: Colors.black54),
+                ),
               ),
 
               const SizedBox(height: 30),
 
-              // PIN INPUT
-              Pinput(
-                length: 6,
-                controller: _otpController,
-                defaultPinTheme: defaultPinTheme,
-                focusedPinTheme: defaultPinTheme.copyWith(
-                  decoration: defaultPinTheme.decoration!.copyWith(
-                    border: Border.all(color: Colors.green),
+              // 🔢 PIN INPUT
+              Center(
+                child: Pinput(
+                  length: 6,
+                  controller: _otpController,
+                  defaultPinTheme: defaultPinTheme,
+                  focusedPinTheme: defaultPinTheme.copyWith(
+                    decoration: defaultPinTheme.decoration!.copyWith(
+                      border: Border.all(color: Colors.green),
+                    ),
                   ),
-                ),
-                submittedPinTheme: defaultPinTheme.copyWith(
-                  decoration: defaultPinTheme.decoration!.copyWith(
-                    border: Border.all(color: Colors.green),
+                  submittedPinTheme: defaultPinTheme.copyWith(
+                    decoration: defaultPinTheme.decoration!.copyWith(
+                      border: Border.all(color: Colors.green),
+                    ),
                   ),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              TextButton(
-                onPressed: () {
-                  // TODO: Hook up resend logic
-                },
-                child: const Text("Resend code"),
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    // TODO: Hook up resend logic
+                  },
+                  child: const Text("Resend code"),
+                ),
               ),
 
               const SizedBox(height: 12),

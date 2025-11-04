@@ -16,7 +16,7 @@ class CustomDrawer extends StatelessWidget {
               decoration: const BoxDecoration(color: Color(0xFF122D5A)),
               currentAccountPicture: const CircleAvatar(
                 backgroundImage: AssetImage(
-                  "assets/icons/avatar.png",
+                  "assets/icons/user_avatar.png",
                 ), // placeholder
               ),
               accountName: const Text(
