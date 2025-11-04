@@ -25,7 +25,7 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
   @override
   void initState() {
     super.initState();
-    _runAnalysis();
+    Future.delayed(const Duration(milliseconds: 500), _runAnalysis);
   }
 
   Future<void> _runAnalysis() async {
@@ -34,28 +34,27 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
       if (!mounted) return;
 
-      // Extract only the needed fields
+      // Extract all useful info, including annotated image
       final yoloSummary = {
         "status": results["status"],
         "drainage_count": results["drainage_count"],
         "obstruction_count": results["obstruction_count"],
+        "annotated_image": results["annotated_image"], // include base64 string
       };
 
-      // Then pass only this smaller map
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => ConfirmationPage(
             imageFile: widget.imageFile,
             selectedLocation: widget.selectedLocation,
-            yoloResults: yoloSummary, // smaller payload
+            yoloResults: yoloSummary,
           ),
         ),
       );
     } catch (e, stack) {
       debugPrint("🔥 YOLO analysis failed: $e");
       debugPrint(stack.toString());
-
       if (!mounted) return;
       setState(() {
         _isError = true;
@@ -75,12 +74,9 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
             children: [
               const Icon(Icons.error_outline, color: Colors.red, size: 48),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 "YOLO Analysis Failed",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(_errorMessage ?? "Unknown error"),

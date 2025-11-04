@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -21,13 +23,24 @@ class ConfirmationPage extends StatefulWidget {
 
 class _ConfirmationPageState extends State<ConfirmationPage> {
   Map<String, dynamic>? _yoloResults;
-  bool _processing = false;
   bool _uploading = false;
+  Uint8List? _annotatedImageBytes; // 🔹 Store decoded image bytes
 
   @override
   void initState() {
     super.initState();
     _yoloResults = widget.yoloResults;
+
+    // 🔹 Decode the base64 annotated image if available
+    if (_yoloResults?["annotated_image"] != null) {
+      try {
+        _annotatedImageBytes = base64Decode(
+          _yoloResults!["annotated_image"] as String,
+        );
+      } catch (e) {
+        debugPrint("⚠️ Failed to decode annotated image: $e");
+      }
+    }
   }
 
   Future<void> _uploadToFirebase(BuildContext context) async {
@@ -37,8 +50,17 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         const SnackBar(content: Text("☁️ Uploading to Firebase...")),
       );
 
+      // 🔹 Save the annotated image temporarily before upload
+      File uploadFile = widget.imageFile;
+      if (_annotatedImageBytes != null) {
+        final tempPath = "${Directory.systemTemp.path}/annotated_upload.jpg";
+        final tempFile = File(tempPath);
+        await tempFile.writeAsBytes(_annotatedImageBytes!);
+        uploadFile = tempFile;
+      }
+
       await storageService.uploadUserImage(
-        widget.imageFile,
+        uploadFile,
         lat: widget.selectedLocation.latitude,
         lng: widget.selectedLocation.longitude,
         yoloResults: _yoloResults,
@@ -67,18 +89,24 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            // 📷 Image preview
+            // 📷 Image Preview (Annotated if available)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                widget.imageFile,
-                height: 250,
-                fit: BoxFit.cover,
-              ),
+              child: _annotatedImageBytes != null
+                  ? Image.memory(
+                      _annotatedImageBytes!,
+                      height: 250,
+                      fit: BoxFit.cover,
+                    )
+                  : Image.file(
+                      widget.imageFile,
+                      height: 250,
+                      fit: BoxFit.cover,
+                    ),
             ),
             const SizedBox(height: 16),
 
-            // 📍 Location info
+            // 📍 Location Info
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -95,7 +123,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
             ),
             const SizedBox(height: 16),
 
-            // 🔎 YOLO detection results (if available)
+            // 🔎 YOLO Detection Results
             if (_yoloResults != null && _yoloResults!.isNotEmpty)
               Card(
                 elevation: 2,
@@ -116,32 +144,25 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                         ),
                       ),
                       const Divider(),
-                      ..._yoloResults!.entries.map(
-                        (e) => Text("${e.key}: ${e.value}"),
+                      Text("Status: ${_yoloResults!["status"]}"),
+                      Text(
+                        "Drainages Detected: ${_yoloResults!["drainage_count"]}",
+                      ),
+                      Text(
+                        "Obstructions Detected: ${_yoloResults!["obstruction_count"]}",
                       ),
                     ],
                   ),
                 ),
-              )
-            else
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Text("No detection results available."),
               ),
 
             const SizedBox(height: 24),
 
-            // ✅ Confirm & Upload button
+            // ✅ Confirm & Upload Button
             ElevatedButton.icon(
               onPressed: _uploading ? null : () => _uploadToFirebase(context),
               icon: const Icon(Icons.cloud_upload_outlined),
-              label: Text(
-                _processing
-                    ? "Analyzing..."
-                    : _uploading
-                    ? "Uploading..."
-                    : "Analyze & Upload",
-              ),
+              label: Text(_uploading ? "Uploading..." : "Confirm & Upload"),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 textStyle: const TextStyle(fontSize: 16),
@@ -150,11 +171,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 12),
 
-            // ❌ Cancel button
+            // ❌ Cancel Button
             TextButton(
-              onPressed: _processing || _uploading
-                  ? null
-                  : () => Navigator.pop(context),
+              onPressed: _uploading ? null : () => Navigator.pop(context),
               child: const Text("Cancel"),
             ),
           ],
