@@ -5,7 +5,7 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
@@ -18,8 +18,8 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [userEmail, setUserEmail] = useState(""); // Store email for later
-  const [originalUid, setOriginalUid] = useState(""); // Store original UID
+  const [userCredentials, setUserCredentials] = useState(null);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   const navigate = useNavigate();
 
   // ✅ Initialize reCAPTCHA safely once
@@ -68,7 +68,7 @@ export default function Login() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  // ✅ Step 1: Email + Password login
+  // ✅ Step 1: Email + Password login with status check
   const handleCredentials = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -89,7 +89,33 @@ export default function Login() {
         return;
       }
 
-      const phone = docSnap.data().phone;
+      const userData = docSnap.data();
+      const status = userData.status || "active"; // Default to active if no status field
+
+      // ✅ Check account status
+      if (status === "suspended") {
+        setMessage("❌ Your account has been suspended. Please contact support.");
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      if (status === "pending") {
+        setShowPendingModal(true);
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      // Only "active" accounts can proceed
+      if (status !== "active") {
+        setMessage("❌ Your account status is invalid. Please contact support.");
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      const phone = userData.phone;
       if (!phone) {
         setMessage("❌ No phone number registered for this admin.");
         await auth.signOut();
@@ -97,9 +123,8 @@ export default function Login() {
         return;
       }
 
-      // Store user info for later
-      setUserEmail(email);
-      setOriginalUid(user.uid);
+      // Store credentials for re-authentication after OTP
+      setUserCredentials({ email, password });
       setPhoneNumber(phone);
 
       // Sign out temporarily to prepare for phone auth
@@ -123,7 +148,7 @@ export default function Login() {
     }
   };
 
-  // ✅ Step 2: Verify OTP
+  // ✅ Step 2: Verify OTP and re-authenticate with email/password
   const handleVerify = async (e) => {
     e.preventDefault();
     if (!confirmationResult) {
@@ -133,47 +158,38 @@ export default function Login() {
     setLoading(true);
     setMessage("");
     try {
-      // Confirm the OTP - this will sign the user in with phone auth
-      const result = await confirmationResult.confirm(otp);
-      console.log("✅ Phone verification successful:", result.user.uid);
+      // Confirm the OTP (this verifies 2FA)
+      await confirmationResult.confirm(otp);
+      console.log("✅ Phone verification successful");
       
-      // CRITICAL FIX: Copy admin role to phone auth UID
-      const phoneAuthUid = result.user.uid;
+      // sign out from phone auth and re-sign in
+      await auth.signOut();
       
-      // Create/update Firestore document for phone auth UID with admin role
-      await setDoc(doc(db, "users", phoneAuthUid), {
-        role: "admin",
-        email: userEmail,
-        phone: phoneNumber,
-        originalUid: originalUid,
-        createdAt: new Date().toISOString()
-      }, { merge: true });
+      // Re-authenticate with the ORIGINAL credentials
+      const userCredential = await signInWithEmailAndPassword(
+        auth, 
+        userCredentials.email, 
+        userCredentials.password
+      );
       
-      console.log("✅ Admin role set for phone auth user");
+      console.log("✅ Re-authenticated with original account:", userCredential.user.uid);
       
-      // Wait for Firestore to update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setMessage("Verified successfully. Redirecting...");
       
-      // Verify the user is actually signed in
-      const currentUser = auth.currentUser;
-      console.log("Current user after OTP:", currentUser?.uid);
-      
-      if (!currentUser) {
-        setMessage("❌ Authentication failed. Please try again.");
-        setLoading(false);
-        return;
-      }
-      
-      setMessage("✅ Verified successfully. Redirecting...");
-      
-      // Navigate to dashboard after successful verification
+      // Navigate to dashboard
       setTimeout(() => {
-        console.log("🚀 Navigating to dashboard...");
+        console.log("Navigating to dashboard...");
         navigate("/", { replace: true });
       }, 500);
     } catch (err) {
       console.error("OTP Error:", err);
-      setMessage("❌ Invalid verification code.");
+      if (err.code === "auth/invalid-verification-code") {
+        setMessage("❌ Invalid verification code.");
+      } else if (err.code === "auth/code-expired") {
+        setMessage("❌ Code expired. Please request a new one.");
+      } else {
+        setMessage("❌ Verification failed. Please try again.");
+      }
       setLoading(false);
     }
   };
@@ -203,11 +219,15 @@ export default function Login() {
     setOtp("");
     setConfirmationResult(null);
     setMessage("");
-    setUserEmail("");
-    setOriginalUid("");
+    setUserCredentials(null);
     try {
       await auth.signOut();
     } catch {}
+  };
+
+  // ✅ Close pending modal
+  const closePendingModal = () => {
+    setShowPendingModal(false);
   };
 
   return (
@@ -321,6 +341,46 @@ export default function Login() {
 
         <div id="recaptcha-container"></div>
       </div>
+
+      {/* ✅ Pending Account Modal */}
+      {showPendingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                <svg
+                  className="w-8 h-8 text-yellow-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-[#213547] mb-3">
+                Account Pending
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Your admin account is currently waiting for approval. Please check back later or contact support for more information.
+              </p>
+              <button
+                onClick={closePendingModal}
+                className="w-full py-2 px-4 rounded-md font-semibold text-white transition"
+                style={{
+                  backgroundColor: "#213547",
+                }}
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

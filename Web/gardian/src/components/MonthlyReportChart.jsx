@@ -55,22 +55,22 @@ export default function MonthlyReportChart() {
       {
         label: "Drainage",
         data: drainageReports,
-        backgroundColor: "rgba(54, 162, 235, 0.8)",
+        backgroundColor: "rgba(28, 133, 168)",
       },
       {
         label: "Pothole",
         data: potholeReports,
-        backgroundColor: "rgba(255, 99, 132, 0.8)",
+        backgroundColor: "rgba(84, 110, 122)",
       },
       {
         label: "Surface",
         data: surfaceReports,
-        backgroundColor: "rgba(255, 206, 86, 0.8)",
+        backgroundColor: "rgba(158, 157, 36)",
       },
       {
         label: "Total Reports",
         data: totalReports,
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
+        backgroundColor: "rgba(59, 130, 246)",
       },
     ],
   };

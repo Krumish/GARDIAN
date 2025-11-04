@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { FaHome, FaChartBar, FaChartLine, FaComments, FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 import { auth } from "../../firebase";
+import { FaUser } from "react-icons/fa";
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -34,6 +35,9 @@ export default function Sidebar() {
         </Link>
         <Link to="/analytics" className="flex items-center gap-3 p-2 rounded hover:bg-gray-700">
           <FaChartLine /> Analytics
+        </Link>
+         <Link to="/usermanagement" className="flex items-center gap-3 p-2 rounded hover:bg-gray-700">
+          <FaUser /> User Management
         </Link>
         <Link to="/feedback" className="flex items-center gap-3 p-2 rounded hover:bg-gray-700">
           <FaComments /> Citizen Feedback

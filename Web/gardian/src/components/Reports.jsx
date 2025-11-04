@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { FaCheckCircle, FaSearch, FaMapMarkerAlt, FaUser } from "react-icons/fa";
 import { RiHourglassFill } from "react-icons/ri";
-import { MdPending, MdAssignment } from "react-icons/md";
+import { MdAssignment } from "react-icons/md";
+import { FaClockRotateLeft } from "react-icons/fa6";
 import { collectionGroup, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
+import { TbReportOff } from "react-icons/tb";
+import { FaUsers } from "react-icons/fa";
 
 export default function Reports() {
   const [reports, setReports] = useState([]);
@@ -65,7 +68,7 @@ export default function Reports() {
   const getInfrastructureType = (report) => {
     if (report.yolo?.drainage_count > 0) return "Drainage";
     // Add more logic here for other types when available
-    return "Unknown";
+    return "Invalid";
   };
 
   // Filtered reports based on search
@@ -76,7 +79,6 @@ export default function Reports() {
       (r.userDetails?.lastName || "").toLowerCase().includes(search.toLowerCase()) ||
       (r.userDetails?.barangay || "").toLowerCase().includes(search.toLowerCase()) ||
       (r.status || "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.assignedOfficer || "").toLowerCase().includes(search.toLowerCase()) ||
       getInfrastructureType(r).toLowerCase().includes(search.toLowerCase())
   );
 
@@ -100,23 +102,6 @@ export default function Reports() {
     return ts;
   };
 
-  // Assign officer to report
-  const handleAssignOfficer = async () => {
-    if (!showAssignModal || !officerName.trim()) return;
-    
-    try {
-      await updateDoc(showAssignModal.docRef, {
-        assignedOfficer: officerName,
-        status: "Assigned"
-      });
-      setShowAssignModal(null);
-      setOfficerName("");
-    } catch (err) {
-      console.error("Error assigning officer:", err);
-      alert("Failed to assign officer");
-    }
-  };
-
   // Update report status
   const handleUpdateStatus = async () => {
     if (!showStatusModal || !newStatus) return;
@@ -137,40 +122,50 @@ export default function Reports() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Reports</h1>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">In Progress</h3>
-          <div className="flex items-center mt-2 text-red-500">
-            <RiHourglassFill className="mr-2" />
-            <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "In Progress").length}
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Assigned</h3>
-          <div className="flex items-center mt-2 text-orange-500">
-            <MdAssignment className="mr-2" />
-            <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "Assigned").length}
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Resolved</h3>
-          <div className="flex items-center mt-2 text-green-500">
-            <FaCheckCircle className="mr-2" />
-            <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "Resolved").length}
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Total Reports</h3>
-          <p className="text-3xl font-bold mt-2">{reports.length}</p>
-        </div>
-      </div>
+  {/* Summary Cards */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+  {/* Pending */}
+  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+    <h3 className="text-sm text-gray-500">Pending</h3>
+    <div className="flex items-center mt-2 text-orange-500">
+      <RiHourglassFill className="mr-2" />
+      <p className="text-2xl font-bold">
+        {reports.filter((r) => r.status === "Pending").length}
+      </p>
+    </div>
+  </div>
+
+  {/* Withdrawn */}
+  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+    <h3 className="text-sm text-gray-500">Withdrawn</h3>
+    <div className="flex items-center mt-2 text-gray-500">
+      <TbReportOff className="mr-2" />
+      <p className="text-2xl font-bold">
+        {reports.filter((r) => r.status === "Withdrawn").length}
+      </p>
+    </div>
+  </div>
+
+  {/* Resolved */}
+  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+    <h3 className="text-sm text-gray-500">Resolved</h3>
+    <div className="flex items-center mt-2 text-green-500">
+      <FaClockRotateLeft className="mr-2" />
+      <p className="text-2xl font-bold">
+        {reports.filter((r) => r.status === "Resolved").length}
+      </p>
+    </div>
+  </div>
+
+  {/* Total Reports */}
+  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+    <h3 className="text-sm text-gray-500">Total Reports</h3>
+    <div className="flex items-center mt-2 text-blue-500">
+      <FaUsers className="mr-2 w-6 h-6" />
+      <p className="text-3xl font-bold">{reports.length}</p>
+    </div>
+  </div>
+</div>
 
       {/* Reports Section */}
       <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
@@ -201,7 +196,6 @@ export default function Reports() {
                 <th className="py-3 px-4">Location</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Time</th>
-                <th className="py-3 px-4">Assigned Officer</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Actions</th>
               </tr>
@@ -248,37 +242,18 @@ export default function Reports() {
                     {formatTime(report.uploadedAt)}
                   </td>
                   <td className="py-3 px-4">
-                    {report.assignedOfficer ? (
-                      <span className="text-blue-600 font-medium">
-                        {report.assignedOfficer}
-                      </span>
-                    ) : (
-                      <button
-                        className="text-gray-400 hover:text-blue-500 text-xs underline"
-                        onClick={() => setShowAssignModal(report)}
-                      >
-                        Assign Officer
-                      </button>
-                    )}
-                  </td>
-                  <td className="py-3 px-4">
                     <button
                       className="flex items-center cursor-pointer"
                       onClick={() => setShowStatusModal(report)}
                     >
                       {report.status === "Pending" && (
-                        <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-                          <MdPending className="mr-1" /> Pending
-                        </span>
-                      )}
-                      {report.status === "Assigned" && (
                         <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-                          <MdAssignment className="mr-1" /> Assigned
+                          <RiHourglassFill className="mr-1" /> Pending
                         </span>
                       )}
-                      {report.status === "In Progress" && (
-                        <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-                          <RiHourglassFill className="mr-1" /> In Progress
+                      {report.status === "Withdrawn" && (
+                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                          <MdAssignment className="mr-1" /> Withdrawn
                         </span>
                       )}
                       {report.status === "Resolved" && (
@@ -367,8 +342,7 @@ export default function Reports() {
             >
               <option value="">Select new status</option>
               <option value="Pending">Pending</option>
-              <option value="Assigned">Assigned</option>
-              <option value="In Progress">In Progress</option>
+              <option value="Withdrawn">Withdrawn</option>
               <option value="Resolved">Resolved</option>
             </select>
             <div className="flex gap-2">
@@ -512,12 +486,6 @@ export default function Reports() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500">Assigned Officer:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedReport.assignedOfficer || "Not assigned"}
-                      </span>
-                    </div>
-                    <div>
                       <span className="text-gray-500">Date:</span>
                       <span className="ml-2 text-xs">
                         {formatDate(selectedReport.uploadedAt)}
@@ -539,10 +507,11 @@ export default function Reports() {
                   <h4 className="font-semibold text-gray-700 mb-3">
                     📷 Report Image
                   </h4>
+                  
                   {selectedReport.url ? (
                     <img
                       src={selectedReport.url}
-                      alt="Report"
+                      alt="Report"  
                       className="rounded-lg border border-gray-200 w-full"
                     />
                   ) : (
