@@ -126,11 +126,11 @@ export default function Analytics() {
 
   // New Report Status Distribution
   const reportStatusData = [
-    { name: "Pending", value: 72 },
-    { name: "In Progress", value: 24 },
+    { name: "Pending", value: 74 },
+    { name: "Withdrawn", value: 24 },
     { name: "Resolved", value: 128 },
   ];
-  const COLORS = ["#EF4444", "#eab308", "#10B981"]; // Yellow, Blue, Green
+  const COLORS = ["#eab308", "#898989", "#10B981"]; // Yellow, Blue, Green
 
   return (
     <div className="p-6 space-y-6">
