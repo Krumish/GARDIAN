@@ -1,21 +1,27 @@
 import { useState, useEffect } from "react";
-import { FaCheckCircle, FaSearch, FaMapMarkerAlt, FaUser } from "react-icons/fa";
+import { collectionGroup, collection, onSnapshot, doc, getDoc, updateDoc, query, where } from "firebase/firestore";
+import { db, auth } from "../../firebase";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable"; // ✅ Changed import
+
+// Icons
+import { TbReportOff } from "react-icons/tb";
+import { FaFilePdf } from "react-icons/fa";
+import { FaUsers } from "react-icons/fa";
+import { FaClockRotateLeft } from "react-icons/fa6";
 import { RiHourglassFill } from "react-icons/ri";
 import { MdAssignment } from "react-icons/md";
-import { FaClockRotateLeft } from "react-icons/fa6";
-import { collectionGroup, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
-import { db, auth } from "../../firebase";
-import { TbReportOff } from "react-icons/tb";
-import { FaUsers } from "react-icons/fa";
+import { FaCheckCircle, FaSearch, FaMapMarkerAlt, FaUser } from "react-icons/fa";
 
 export default function Reports() {
   const [reports, setReports] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
-  const [showAssignModal, setShowAssignModal] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(null);
-  const [officerName, setOfficerName] = useState("");
   const [newStatus, setNewStatus] = useState("");
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   // Fetch all uploads across all users in real-time
   useEffect(() => {
@@ -102,6 +108,83 @@ export default function Reports() {
     return ts;
   };
 
+  // PDF generation function
+  const handleGeneratePDF = () => {
+    if (!selectedMonth || !selectedYear) {
+      alert("Please select a month and year before generating the report.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const monthNames = ["January", "February", "March", "April", "May", "June", 
+                        "July", "August", "September", "October", "November", "December"];
+
+    // filtered reports
+    const filtered = reports.filter((r) => {
+      if (!r.uploadedAt?.toDate) return false;
+      const date = r.uploadedAt.toDate();
+      return (
+        date.getMonth() + 1 === parseInt(selectedMonth) &&
+        date.getFullYear() === parseInt(selectedYear)
+      );
+    });
+
+    if (filtered.length === 0) {
+      alert("No reports found for the selected month/year.");
+      return;
+    }
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Monthly Report - ${monthNames[parseInt(selectedMonth) - 1]} ${selectedYear}`, 14, 20);
+    
+    // Generation date
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+
+    // Summary table
+    const summary = [
+      ["Total Reports", filtered.length],
+      ["Pending", filtered.filter((r) => r.status === "Pending").length],
+      ["Withdrawn", filtered.filter((r) => r.status === "Withdrawn").length],
+      ["Resolved", filtered.filter((r) => r.status === "Resolved").length],
+      ["Drainage Reports", filtered.filter((r) => r.yolo?.drainage_count > 0).length],
+    ];
+
+    autoTable(doc, {
+      head: [["Metric", "Count"]],
+      body: summary,
+      startY: 35,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+
+    // Detailed reports table
+    const tableData = filtered.map((r) => [
+      r.id.substring(0, 8) + "...",
+      `${r.userDetails?.firstName || ""} ${r.userDetails?.lastName || ""}`.trim() || "-",
+      getInfrastructureType(r),
+      r.userDetails?.barangay || "-",
+      r.status || "Pending",
+      r.uploadedAt?.toDate().toLocaleDateString() || "-",
+      r.uploadedAt?.toDate().toLocaleTimeString() || "-",
+    ]);
+
+    autoTable(doc, {
+      head: [["ID", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
+      body: tableData,
+      startY: doc.lastAutoTable.finalY + 10,
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246] },
+      styles: { fontSize: 8 }
+    });
+
+    // Save PDF
+    doc.save(`Report_${monthNames[parseInt(selectedMonth) - 1]}_${selectedYear}.pdf`);
+  };
+
   // Update report status
   const handleUpdateStatus = async () => {
     if (!showStatusModal || !newStatus) return;
@@ -122,66 +205,76 @@ export default function Reports() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Reports</h1>
 
-  {/* Summary Cards */}
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-  {/* Pending */}
-  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-    <h3 className="text-sm text-gray-500">Pending</h3>
-    <div className="flex items-center mt-2 text-orange-500">
-      <RiHourglassFill className="mr-2" />
-      <p className="text-2xl font-bold">
-        {reports.filter((r) => r.status === "Pending").length}
-      </p>
-    </div>
-  </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Pending */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+          <h3 className="text-sm text-gray-500">Pending</h3>
+          <div className="flex items-center mt-2 text-orange-500">
+            <RiHourglassFill className="mr-2" />
+            <p className="text-2xl font-bold">
+              {reports.filter((r) => r.status === "Pending").length}
+            </p>
+          </div>
+        </div>
 
-  {/* Withdrawn */}
-  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-    <h3 className="text-sm text-gray-500">Withdrawn</h3>
-    <div className="flex items-center mt-2 text-gray-500">
-      <TbReportOff className="mr-2" />
-      <p className="text-2xl font-bold">
-        {reports.filter((r) => r.status === "Withdrawn").length}
-      </p>
-    </div>
-  </div>
+        {/* Withdrawn */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+          <h3 className="text-sm text-gray-500">Withdrawn</h3>
+          <div className="flex items-center mt-2 text-gray-500">
+            <TbReportOff className="mr-2" />
+            <p className="text-2xl font-bold">
+              {reports.filter((r) => r.status === "Withdrawn").length}
+            </p>
+          </div>
+        </div>
 
-  {/* Resolved */}
-  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-    <h3 className="text-sm text-gray-500">Resolved</h3>
-    <div className="flex items-center mt-2 text-green-500">
-      <FaClockRotateLeft className="mr-2" />
-      <p className="text-2xl font-bold">
-        {reports.filter((r) => r.status === "Resolved").length}
-      </p>
-    </div>
-  </div>
+        {/* Resolved */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+          <h3 className="text-sm text-gray-500">Resolved</h3>
+          <div className="flex items-center mt-2 text-green-500">
+            <FaClockRotateLeft className="mr-2" />
+            <p className="text-2xl font-bold">
+              {reports.filter((r) => r.status === "Resolved").length}
+            </p>
+          </div>
+        </div>
 
-  {/* Total Reports */}
-  <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-    <h3 className="text-sm text-gray-500">Total Reports</h3>
-    <div className="flex items-center mt-2 text-blue-500">
-      <FaUsers className="mr-2 w-6 h-6" />
-      <p className="text-3xl font-bold">{reports.length}</p>
-    </div>
-  </div>
-</div>
+        {/* Total Reports */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+          <h3 className="text-sm text-gray-500">Total Reports</h3>
+          <div className="flex items-center mt-2 text-blue-500">
+            <FaUsers className="mr-2 w-6 h-6" />
+            <p className="text-3xl font-bold">{reports.length}</p>
+          </div>
+        </div>
+      </div>
 
       {/* Reports Section */}
       <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">All Reports</h2>
 
-          {/* Search */}
-          <div className="relative w-full sm:w-1/3">
-            <FaSearch className="absolute left-3 top-3 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search reports..."
-              className="border border-gray-300 rounded-lg pl-10 pr-4 py-2 w-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex items-center gap-3">
+            {/* Generate PDF Button */}
+            <button
+              className="flex items-center bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+              onClick={() => setShowReportModal(true)}
+            >
+              <FaFilePdf className="mr-2" /> Generate Report
+            </button>
+
+            {/* Search Bar */}
+            <div className="relative w-48 sm:w-64">
+              <FaSearch className="absolute left-3 top-3 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search reports..."
+                className="border border-gray-300 rounded-lg pl-10 pr-4 py-2 w-full"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -288,36 +381,63 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Assign Officer Modal */}
-      {showAssignModal && (
+      {/* 📄 Generate Report Modal */}
+      {showReportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4">Assign Officer</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Report ID: {showAssignModal.id.substring(0, 12)}...
-            </p>
-            <input
-              type="text"
-              placeholder="Enter officer name"
-              className="border border-gray-300 rounded-lg px-4 py-2 w-full mb-4"
-              value={officerName}
-              onChange={(e) => setOfficerName(e.target.value)}
-            />
-            <div className="flex gap-2">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold mb-4">Generate Monthly Report</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Month</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
+                  <option value="">Select Month</option>
+                  {[
+                    "January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December",
+                  ].map((m, i) => (
+                    <option key={i} value={i + 1}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Year</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                >
+                  {[2024, 2025, 2026].map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
               <button
-                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
-                onClick={() => {
-                  setShowAssignModal(null);
-                  setOfficerName("");
-                }}
+                className="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
+                onClick={() => setShowReportModal(false)}
               >
                 Cancel
               </button>
               <button
-                className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
-                onClick={handleAssignOfficer}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+                onClick={() => {
+                  handleGeneratePDF();
+                  setShowReportModal(false);
+                }}
               >
-                Assign
+                Generate PDF
               </button>
             </div>
           </div>
