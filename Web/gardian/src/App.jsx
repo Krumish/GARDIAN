@@ -1,8 +1,9 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { auth, db } from "../firebase";
+import { db } from "../firebase";
 import { FaClockRotateLeft } from "react-icons/fa6";
-import { doc, getDoc, collectionGroup, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import { collectionGroup, onSnapshot, query, orderBy, limit, getDoc, doc } from "firebase/firestore";
+import { useUser } from "./context/UserContext.jsx";
 
 // Components
 import Sidebar from "./components/Sidebar";
@@ -14,9 +15,10 @@ import CitizenFeedback from "./components/CitizenFeedback";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import UserManagement from "./components/UserManagement";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 // Icons
-import { FaCheckCircle, FaClipboardList } from "react-icons/fa";
+import { FaCheckCircle } from "react-icons/fa";
 import { FaUsers } from "react-icons/fa";
 import { TbReportOff } from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
@@ -24,48 +26,15 @@ import { MdPending } from "react-icons/md";
 
 export default function App() {
   const location = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { user, role, loading } = useUser(); // Use context instead of local state
   const [recentReports, setRecentReports] = useState([]);
 
   const isAuthPage =
     location.pathname === "/login" || location.pathname === "/signup";
 
-  // Check Firebase auth & admin role
+  // Fetch recent 5 reports (only when user is authenticated)
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        try {
-          const docRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists() && docSnap.data().role === "admin") {
-            setIsAuthenticated(true);
-            setIsAdmin(true);
-          } else {
-            setIsAuthenticated(false);
-            setIsAdmin(false);
-            auth.signOut();
-          }
-        } catch (err) {
-          console.error(err);
-          setIsAuthenticated(false);
-          setIsAdmin(false);
-        }
-      } else {
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Fetch recent 5 reports
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user || !isAdmin) return;
+    if (!user || !role) return;
 
     const uploadsQuery = query(
       collectionGroup(db, "uploads"),
@@ -107,23 +76,24 @@ export default function App() {
     );
 
     return () => unsubscribe();
-  }, [isAdmin]);
+  }, [user, role]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen text-xl font-semibold">
         Loading...
       </div>
     );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      {!isAuthPage && <Sidebar />}
+      {!isAuthPage && user && <Sidebar />}
 
       <div className="flex-1 flex flex-col">
         {/* Topbar fixed at the top */}
-        {!isAuthPage && (
+        {!isAuthPage && user && (
           <div className="sticky top-0 z-50">
             <Topbar />
           </div>
@@ -132,39 +102,39 @@ export default function App() {
         {/* Main scrollable content */}
         <main className="flex-1 p-6 overflow-y-auto">
           <Routes>
+            
             {/* Dashboard */}
             <Route
               path="/"
               element={
-                isAuthenticated && isAdmin ? (
-                  <Dashboard recentReports={recentReports} />
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
+                <ProtectedRoute
+                  component={() => <Dashboard recentReports={recentReports} />}
+                  allowedRoles={["super_admin", "personnel_admin"]}
+              />
+             }
+           />
 
             {/* Auth Pages */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
 
             {/* Other Pages */}
-            <Route
-              path="/analytics"
-              element={isAdmin ? <Analytics /> : <Navigate to="/login" replace />}
-            />
-            <Route
-              path="/reports"
-              element={isAdmin ? <Reports /> : <Navigate to="/login" replace />}
-            />
-            <Route
-              path="/usermanagement"
-              element={isAdmin ? <UserManagement /> : <Navigate to="/login" replace />}
-            />
-            <Route
-              path="/feedback"
-              element={isAdmin ? <CitizenFeedback /> : <Navigate to="/login" replace />}
-            />
+              <Route
+                 path="/analytics"
+                element={<ProtectedRoute component={Analytics} allowedRoles={["super_admin","personnel_admin"]} />}
+              />
+              <Route
+                 path="/reports"
+                element={<ProtectedRoute component={Reports} allowedRoles={["super_admin","personnel_admin","staff_admin"]} />}
+              />
+              <Route
+                path="/usermanagement"
+               element={<ProtectedRoute component={UserManagement} allowedRoles={["super_admin"]} />}
+              />
+              <Route
+                 path="/feedback"
+               element={<ProtectedRoute component={CitizenFeedback} allowedRoles={["super_admin","personnel_admin"]} />}
+              />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />

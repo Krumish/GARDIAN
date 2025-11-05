@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
-import { FaClock, FaExclamationTriangle } from "react-icons/fa";
-import { MdTrendingUp, MdLocationOn } from "react-icons/md";
+import { FaClock, FaExclamationTriangle, FaUsers } from "react-icons/fa";
+import { MdDoneAll } from "react-icons/md";
+import { FiCheckCircle } from "react-icons/fi";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Bar, Line } from "react-chartjs-2";
 import {
@@ -130,43 +131,55 @@ export default function Analytics() {
     { name: "Withdrawn", value: 24 },
     { name: "Resolved", value: 128 },
   ];
-  const COLORS = ["#eab308", "#898989", "#10B981"]; // Yellow, Blue, Green
+  const COLORS = ["#F59E0B", "#6B7280", "#10B981"]; // Yellow, Blue, Green
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Analytics</h1>
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-4 rounded-lg shadow flex items-center">
-          <FaClock className="text-blue-500 text-3xl mr-3" />
-          <div>
-            <p className="text-sm text-gray-500">Avg. Resolution Days</p>
-            <p className="text-lg font-bold">3 Days</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow flex items-center">
-          <FaExclamationTriangle className="text-red-500 text-3xl mr-3" />
-          <div>
-            <p className="text-sm text-gray-500">Pending Issues</p>
-            <p className="text-lg font-bold">72</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow flex items-center">
-          <MdTrendingUp className="text-green-500 text-3xl mr-3" />
-          <div>
-            <p className="text-sm text-gray-500">Resolved This Month</p>
-            <p className="text-lg font-bold">128</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow flex items-center">
-          <MdLocationOn className="text-purple-500 text-3xl mr-3" />
-          <div>
-            <p className="text-sm text-gray-500">Barangays Covered</p>
-            <p className="text-lg font-bold">10</p>
-          </div>
-        </div>
-      </div>
+      {/* Top Summary Cards */}
+<div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4">
+  {/* Avg. Resolution Speed */}
+  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
+    <FaClock className="text-blue-500 text-3xl mr-4" />
+    <div>
+      <p className="text-sm text-gray-500">Avg. Resolution Speed</p>
+      <p className="text-xl font-bold text-gray-800">2.4 Days</p>
+      <p className="text-xs text-green-500 font-medium">12% Faster</p>
+    </div>
+  </div>
+
+  {/* Active Citizens Reporting */}
+  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
+    <FaUsers className="text-emerald-500 text-3xl mr-4" />
+    <div>
+      <p className="text-sm text-gray-500">Active Citizens Reporting</p>
+      <p className="text-xl font-bold text-gray-800">217 Users</p>
+      <p className="text-xs text-green-500 font-medium">+8% Growth</p>
+    </div>
+  </div>
+
+  {/* Immediate High Risk */}
+  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
+    <FaExclamationTriangle className="text-red-500 text-3xl mr-4" />
+    <div>
+      <p className="text-sm text-gray-500">Immediate High-Risk Reports</p>
+      <p className="text-xl font-bold text-gray-800">42 Reports</p>
+      <p className="text-xs text-red-500 font-medium">Action Required</p>
+    </div>
+  </div>
+
+  {/* Proactive Reports Closed */}
+  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
+    <FiCheckCircle className="text-purple-500 text-3xl mr-4" />
+    <div>
+      <p className="text-sm text-gray-500">Proactive Reports Closed</p>
+      <p className="text-xl font-bold text-gray-800">95 Reports</p>
+      <p className="text-xs text-indigo-500 font-medium">15% of Total</p>
+    </div>
+  </div>
+</div>
+
 
       {/* Heatmap of Problem Areas */}
       <div className="bg-white p-6 rounded-xl shadow">

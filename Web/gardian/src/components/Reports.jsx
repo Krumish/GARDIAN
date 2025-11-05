@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { collectionGroup, collection, onSnapshot, doc, getDoc, updateDoc, query, where } from "firebase/firestore";
-import { db, auth } from "../../firebase";
+import { db, auth, storage } from "../../firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // ✅ Changed import
+import autoTable from "jspdf-autotable"; 
 
 // Icons
 import { TbReportOff } from "react-icons/tb";
@@ -22,6 +23,7 @@ export default function Reports() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [resolvedImage, setResolvedImage] = useState(null)
 
   // Fetch all uploads across all users in real-time
   useEffect(() => {
@@ -187,19 +189,54 @@ export default function Reports() {
 
   // Update report status
   const handleUpdateStatus = async () => {
-    if (!showStatusModal || !newStatus) return;
-    
-    try {
-      await updateDoc(showStatusModal.docRef, {
-        status: newStatus
-      });
-      setShowStatusModal(null);
-      setNewStatus("");
-    } catch (err) {
-      console.error("Error updating status:", err);
-      alert("Failed to update status");
+  if (!showStatusModal || !newStatus) return;
+
+  try {
+    // If marking as Resolved, require image upload
+    let resolvedImageUrl = null;
+
+    if (newStatus === "Resolved") {
+      if (!resolvedImage) {
+        alert("Please upload a resolved image before marking as resolved.");
+        return;
+      }
+
+      // Upload image to Firebase Storage
+      const storageRef = ref(
+        storage,
+        `resolved_images/${showStatusModal.id}_${Date.now()}.jpg`
+      );
+      await uploadBytes(storageRef, resolvedImage);
+      resolvedImageUrl = await getDownloadURL(storageRef);
     }
-  };
+
+    // Get a valid doc reference (sometimes modal stores plain data)
+    const reportDoc =
+      showStatusModal.docRef?.id
+        ? showStatusModal.docRef
+        : doc(db, "users", showStatusModal.userId, "uploads", showStatusModal.id);
+
+    // Update Firestore
+    const updateData = {
+      status: newStatus,
+    };
+
+    if (resolvedImageUrl) {
+      updateData.resolvedImage = resolvedImageUrl;
+      updateData.resolvedAt = new Date();
+    }
+
+    await updateDoc(reportDoc, updateData);
+
+    alert("✅ Report status updated successfully!");
+    setShowStatusModal(null);
+    setNewStatus("");
+    setResolvedImage(null);
+  } catch (err) {
+    console.error("Error updating status:", err);
+    alert("Failed to update status. Check console for details.");
+  }
+};
 
   return (
     <div className="p-6 space-y-6">
@@ -286,7 +323,7 @@ export default function Reports() {
                 <th className="py-3 px-4">Report ID</th>
                 <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Location</th>
+                <th className="py-3 px-4">Address</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Time</th>
                 <th className="py-3 px-4">Status</th>
@@ -317,16 +354,24 @@ export default function Reports() {
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-4">
-                    <span className="text-gray-700 text-xs font-medium">
-                      {getInfrastructureType(report)}
-                    </span>
+
+                  <td className="py-3 px-4 text-gray-700">
+                    {report.yolo?.drainage_count > 0
+                    ? "Drainage" 
+                    : report.yolo?.pothole_count > 0
+                    ? "Pothole"
+                    : report.yolo?.road_surface_count > 0
+                    ? "Road Surface"
+                    : "Unkown" }
                   </td>
+
                   <td className="py-3 px-4">
                     <div className="flex items-center">
                       <FaMapMarkerAlt className="text-gray-400 mr-1 text-xs" />
-                      {report.userDetails?.barangay || "-"}
-                    </div>
+                        <span className="text-gray-700 text-xs font-medium">
+                        {report.address || "-"}
+                        </span>
+                      </div>
                   </td>
                   <td className="py-3 px-4 text-xs">
                     {formatDate(report.uploadedAt)}
@@ -465,6 +510,20 @@ export default function Reports() {
               <option value="Withdrawn">Withdrawn</option>
               <option value="Resolved">Resolved</option>
             </select>
+            
+            {newStatus === "Resolved" && (
+  <div className="mb-4">
+    <label className="block text-sm text-gray-600 mb-2">
+      Upload updated image (required)
+    </label>
+    <input
+      type="file"
+      accept="image/*"
+      onChange={(e) => setResolvedImage(e.target.files[0])}
+      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+    />
+  </div>
+)}
             <div className="flex gap-2">
               <button
                 className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
@@ -539,6 +598,12 @@ export default function Reports() {
                     📍 Location
                   </h4>
                   <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Address:</span>
+                      <span className="ml-2 font-medium">
+                       {selectedReport.address || "-"}
+                     </span>
+                    </div>
                     <div>
                       <span className="text-gray-500">Latitude:</span>
                       <span className="ml-2 font-mono text-xs">
@@ -627,18 +692,50 @@ export default function Reports() {
                   <h4 className="font-semibold text-gray-700 mb-3">
                     📷 Report Image
                   </h4>
-                  
-                  {selectedReport.url ? (
-                    <img
-                      src={selectedReport.url}
-                      alt="Report"  
-                      className="rounded-lg border border-gray-200 w-full"
-                    />
-                  ) : (
-                    <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-400">
-                      No image available
-                    </div>
-                  )}
+
+              {/* Original Image */}
+              {selectedReport.url ? (
+               <div>
+                 <p p className="text-sm text-gray-600 mb-2 font-medium">Original Image</p>
+                <img
+                src={selectedReport.url}
+                 alt="Original"
+                 className="rounded-lg border border-gray-200 w-full"
+              />
+             </div>
+             ) : (
+            <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-400">
+               No original image available
+            </div>
+             )}
+             {/* Annotated Image */}
+              <div className="space-y-4">
+              {selectedReport.annotatedUrl ? (
+               <div>
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Annotated Image</p>
+                  <img
+                  src={selectedReport.annotatedUrl}
+                  alt="Annotated"
+                  className="rounded-lg border border-gray-200 w-full"
+                />
+                </div>
+                ) : (
+              <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-400">
+                No annotated image available
+              </div>
+              )}
+            {/* Resolved Image */}
+              {selectedReport.resolvedImage ? (
+              <div className="mt-4">
+               <p className="text-sm text-gray-600 mb-2 font-medium">Resolved Image</p>
+              <img
+              src={selectedReport.resolvedImage}
+             alt="Resolved"
+             className="rounded-lg border border-gray-200 w-full"
+            />
+            </div>
+            ) : null} 
+                  </div>
                 </div>
               </div>
             </div>

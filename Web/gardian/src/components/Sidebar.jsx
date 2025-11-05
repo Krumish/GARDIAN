@@ -28,7 +28,7 @@ export default function Sidebar() {
 
       <nav className="flex-1 p-4 space-y-3">
         <Link to="/" className="flex items-center gap-3 p-2 rounded hover:bg-gray-700">
-          <FaHome /> Home
+          <FaHome /> Dashboard
         </Link>
         <Link to="/reports" className="flex items-center gap-3 p-2 rounded hover:bg-gray-700">
           <FaChartBar /> Reports
