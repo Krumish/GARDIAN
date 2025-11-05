@@ -62,6 +62,11 @@ export default function Reports() {
             };
           })
         );
+        allReports.sort((a, b) => {
+        const dateA = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(0);
+        const dateB = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(0);
+        return dateB - dateA;
+      });
         setReports(allReports);
       },
       (error) => {
@@ -135,6 +140,13 @@ export default function Reports() {
       alert("No reports found for the selected month/year.");
       return;
     }
+
+    filtered.sort((a, b) => {
+    const dateA = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(0);
+    const dateB = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(0);
+    return dateB - dateA; // newest first
+    });
+
 
     // Title
     doc.setFontSize(18);
