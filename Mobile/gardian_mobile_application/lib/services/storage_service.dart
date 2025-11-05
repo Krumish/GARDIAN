@@ -14,6 +14,8 @@ class StorageService {
     Map<String, dynamic>? yoloResults,
     double? lat,
     double? lng,
+    String? address,
+    String? note,
   }) async {
     final uid = authService.value.currentUser?.uid;
     print("🔥 Current UID: $uid");
@@ -72,6 +74,8 @@ class StorageService {
           "yolo": cleanYolo,
           "latitude": lat,
           "longitude": lng,
+          "address": address,
+          "note": note?.trim(),
           "status": "Pending",
         });
 

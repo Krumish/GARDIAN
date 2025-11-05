@@ -6,9 +6,9 @@ import 'package:path_provider/path_provider.dart';
 class YoloService {
   static Future<Map<String, dynamic>> detect(File file) async {
     try {
-      // final uri = Uri.parse("https: //yolo-backend-xrko.onrender.com/");
+      // final uri = Uri.parse("https://yolo-backend-xrko.onrender.com/detect/");
       final uri = Uri.parse("http://10.0.2.2:8000/detect/");
-      
+
       final request = http.MultipartRequest("POST", uri);
       request.files.add(await http.MultipartFile.fromPath("file", file.path));
 

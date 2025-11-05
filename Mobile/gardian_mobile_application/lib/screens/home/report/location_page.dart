@@ -15,7 +15,7 @@ class LocationPage extends StatefulWidget {
 }
 
 class _LocationPageState extends State<LocationPage> {
-  LatLng? _selectedLocation;
+  LatLng? _selectedCoordinate;
   GoogleMapController? _mapController;
   bool _loading = true;
   bool _processing = false;
@@ -56,17 +56,17 @@ class _LocationPageState extends State<LocationPage> {
     );
 
     setState(() {
-      _selectedLocation = LatLng(position.latitude, position.longitude);
+      _selectedCoordinate = LatLng(position.latitude, position.longitude);
       _loading = false;
     });
 
     _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(_selectedLocation!, 17),
+      CameraUpdate.newLatLngZoom(_selectedCoordinate!, 17),
     );
   }
 
   Future<void> _processAndConfirm() async {
-    if (_selectedLocation == null) return;
+    if (_selectedCoordinate == null) return;
 
     try {
       setState(() => _processing = true);
@@ -76,7 +76,7 @@ class _LocationPageState extends State<LocationPage> {
         MaterialPageRoute(
           builder: (_) => AnalysisLoadingPage(
             imageFile: widget.imageFile,
-            selectedLocation: _selectedLocation!,
+            selectedCoordinate: _selectedCoordinate!,
           ),
         ),
       );
@@ -101,22 +101,22 @@ class _LocationPageState extends State<LocationPage> {
                   onMapCreated: (controller) => _mapController = controller,
                   initialCameraPosition: CameraPosition(
                     target:
-                        _selectedLocation ?? const LatLng(14.5995, 120.9842),
+                        _selectedCoordinate ?? const LatLng(14.5995, 120.9842),
                     zoom: 17,
                   ),
-                  markers: _selectedLocation != null
+                  markers: _selectedCoordinate != null
                       ? {
                           Marker(
                             markerId: const MarkerId("selected"),
-                            position: _selectedLocation!,
+                            position: _selectedCoordinate!,
                             draggable: true,
                             onDragEnd: (newPos) {
-                              setState(() => _selectedLocation = newPos);
+                              setState(() => _selectedCoordinate = newPos);
                             },
                           ),
                         }
                       : {},
-                  onTap: (pos) => setState(() => _selectedLocation = pos),
+                  onTap: (pos) => setState(() => _selectedCoordinate = pos),
                 ),
                 Positioned(
                   bottom: 20,
