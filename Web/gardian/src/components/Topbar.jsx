@@ -56,7 +56,7 @@ export default function Topbar() {
               severity = "medium";
             }
 
-            // Extract street from address
+            // Extract street from address which
             const fullAddress = uploadData.address || "";
             const street = fullAddress.split(",")[0] || fullAddress;
 
