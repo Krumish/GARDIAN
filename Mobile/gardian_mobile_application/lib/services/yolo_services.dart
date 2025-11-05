@@ -2,12 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'config_service.dart'; // ✅ import your new config service
 
 class YoloService {
   static Future<Map<String, dynamic>> detect(File file) async {
     try {
-      // final uri = Uri.parse("https://yolo-backend-xrko.onrender.com/detect/");
-      final uri = Uri.parse("http://10.0.2.2:8000/detect/");
+      final url = await ConfigService.getYoloUrl(); // ✅ Fetch from Firestore
+      final uri = Uri.parse(url);
 
       final request = http.MultipartRequest("POST", uri);
       request.files.add(await http.MultipartFile.fromPath("file", file.path));
@@ -18,7 +19,6 @@ class YoloService {
         final body = await response.stream.bytesToString();
         final decoded = jsonDecode(body) as Map<String, dynamic>;
 
-        // 🔹 Decode annotated image (base64)
         if (decoded.containsKey("annotated_image")) {
           final bytes = base64Decode(decoded["annotated_image"]);
           final dir = await getTemporaryDirectory();
@@ -26,8 +26,6 @@ class YoloService {
             "${dir.path}/annotated_${DateTime.now().millisecondsSinceEpoch}.jpg",
           );
           await annotatedFile.writeAsBytes(bytes);
-
-          // Attach the annotated file to the result map
           decoded["annotatedFile"] = annotatedFile;
         }
 
