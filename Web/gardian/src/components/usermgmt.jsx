@@ -12,10 +12,6 @@ export default function UserManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [roleFilter, setRoleFilter] = useState("all");
-  
-  // ✅ Define admin roles (must match Login.jsx)
-  const ADMIN_ROLES = ["super_admin", "personnel_admin", "staff_admin"];
   
   // Add user form
   const [newUser, setNewUser] = useState({
@@ -24,8 +20,7 @@ export default function UserManagement() {
     firstName: "",
     lastName: "",
     phone: "",
-    status: "active",
-    role: "personnel_admin" // Default role
+    status: "active"
   });
 
   // Edit user form
@@ -34,8 +29,7 @@ export default function UserManagement() {
     firstName: "",
     lastName: "",
     phone: "",
-    status: "",
-    role: ""
+    status: ""
   });
 
   // Fetch all admin users in real-time
@@ -49,8 +43,8 @@ export default function UserManagement() {
           id: doc.id,
           ...doc.data(),
         }));
-        // Filter only admin users (any of the three admin roles)
-        const adminUsers = allUsers.filter(user => ADMIN_ROLES.includes(user.role));
+        // Filter only admin users
+        const adminUsers = allUsers.filter(user => user.role === "admin");
         setUsers(adminUsers);
       },
       (error) => {
@@ -61,7 +55,7 @@ export default function UserManagement() {
     return () => unsubscribe();
   }, []);
 
-  // Filtered users based on search, status, and role
+  // Filtered users based on search and status
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
       (u.email || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -69,9 +63,8 @@ export default function UserManagement() {
       (u.lastName || "").toLowerCase().includes(search.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || (u.status || "active") === statusFilter;
-    const matchesRole = roleFilter === "all" || u.role === roleFilter;
     
-    return matchesSearch && matchesStatus && matchesRole;
+    return matchesSearch && matchesStatus;
   });
 
   // Helper to format date and time
@@ -85,16 +78,6 @@ export default function UserManagement() {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
-
-  // Helper to format role display name
-  const formatRoleName = (role) => {
-    const roleNames = {
-      super_admin: "Super Admin",
-      personnel_admin: "Personnel Admin",
-      staff_admin: "Staff Admin"
-    };
-    return roleNames[role] || role;
   };
 
   // Add new admin user
@@ -124,7 +107,7 @@ export default function UserManagement() {
         lastName: newUser.lastName,
         phone: newUser.phone,
         status: newUser.status,
-        role: newUser.role, // ✅ Now uses the selected role
+        role: "admin",
         createdAt: new Date(),
       });
 
@@ -138,11 +121,13 @@ export default function UserManagement() {
         firstName: "",
         lastName: "",
         phone: "",
-        status: "active",
-        role: "personnel_admin"
+        status: "active"
       });
       
       alert("Admin user created successfully! Please log back in.");
+      
+      // Optionally redirect to login page
+      // window.location.href = '/login';
       
     } catch (err) {
       console.error("Error adding user:", err);
@@ -162,8 +147,7 @@ export default function UserManagement() {
         firstName: editUser.firstName,
         lastName: editUser.lastName,
         phone: editUser.phone || "",
-        status: editUser.status,
-        role: editUser.role // ✅ Include role in update
+        status: editUser.status
       };
 
       // Only update email if it changed
@@ -179,8 +163,7 @@ export default function UserManagement() {
         firstName: "",
         lastName: "",
         phone: "",
-        status: "",
-        role: ""
+        status: ""
       });
       
       alert("User updated successfully!");
@@ -212,8 +195,7 @@ export default function UserManagement() {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone || "",
-      status: user.status || "active",
-      role: user.role || "personnel_admin"
+      status: user.status || "active"
     });
     setShowEditModal(user);
   };
@@ -228,16 +210,6 @@ export default function UserManagement() {
     return colors[status] || colors.active;
   };
 
-  // Get role badge color
-  const getRoleBadge = (role) => {
-    const colors = {
-      super_admin: "bg-purple-100 text-purple-700",
-      personnel_admin: "bg-blue-100 text-blue-700",
-      staff_admin: "bg-indigo-100 text-indigo-700"
-    };
-    return colors[role] || "bg-gray-100 text-gray-700";
-  };
-
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">User Management</h1>
@@ -249,21 +221,21 @@ export default function UserManagement() {
           <p className="text-3xl font-bold mt-2">{users.length}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Super Admins</h3>
-          <p className="text-3xl font-bold mt-2 text-purple-500">
-            {users.filter(u => u.role === "super_admin").length}
+          <h3 className="text-sm text-gray-500">Active</h3>
+          <p className="text-3xl font-bold mt-2 text-green-500">
+            {users.filter(u => (u.status || "active") === "active").length}
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Personnel Admins</h3>
-          <p className="text-3xl font-bold mt-2 text-blue-500">
-            {users.filter(u => u.role === "personnel_admin").length}
+          <h3 className="text-sm text-gray-500">Pending</h3>
+          <p className="text-3xl font-bold mt-2 text-yellow-500">
+            {users.filter(u => u.status === "pending").length}
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
-          <h3 className="text-sm text-gray-500">Staff Admins</h3>
-          <p className="text-3xl font-bold mt-2 text-indigo-500">
-            {users.filter(u => u.role === "staff_admin").length}
+          <h3 className="text-sm text-gray-500">Suspended</h3>
+          <p className="text-3xl font-bold mt-2 text-red-500">
+            {users.filter(u => u.status === "suspended").length}
           </p>
         </div>
       </div>
@@ -306,38 +278,19 @@ export default function UserManagement() {
         {/* Filter Dropdown */}
         {showFilterModal && (
           <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Filter by Status
-                </label>
-                <select
-                  className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="suspended">Suspended</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Filter by Role
-                </label>
-                <select
-                  className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
-                >
-                  <option value="all">All Roles</option>
-                  <option value="super_admin">Super Admin</option>
-                  <option value="personnel_admin">Personnel Admin</option>
-                  <option value="staff_admin">Staff Admin</option>
-                </select>
-              </div>
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by Status
+            </label>
+            <select
+              className="border border-gray-300 rounded-lg px-4 py-2 w-full max-w-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="suspended">Suspended</option>
+            </select>
           </div>
         )}
       </div>
@@ -375,10 +328,8 @@ export default function UserManagement() {
                       {user.status || "active"}
                     </span>
                   </td>
-                  <td className="py-3 px-4">
-                    <span className={`${getRoleBadge(user.role)} px-2 py-1 rounded-full text-xs font-medium`}>
-                      {formatRoleName(user.role)}
-                    </span>
+                  <td className="py-3 px-4 text-gray-700">
+                    Admin
                   </td>
                   <td className="py-3 px-4 text-xs">
                     {formatDateTime(user.createdAt)}
@@ -421,7 +372,7 @@ export default function UserManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-lg p-8">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-800">Add New Admin User</h3>
+              <h3 className="text-2xl font-bold text-gray-800">Add New User</h3>
               <button
                 onClick={() => {
                   setShowAddModal(false);
@@ -431,8 +382,7 @@ export default function UserManagement() {
                     firstName: "",
                     lastName: "",
                     phone: "",
-                    status: "active",
-                    role: "personnel_admin"
+                    status: "active"
                   });
                 }}
                 className="text-gray-400 hover:text-gray-600"
@@ -503,34 +453,11 @@ export default function UserManagement() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Enter phone number (e.g., +639123456789)"
+                  placeholder="Enter phone number"
                   className="border border-gray-300 rounded-lg px-4 py-2.5 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   value={newUser.phone}
                   onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Required for 2FA login verification
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Role <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className="border border-gray-300 rounded-lg px-4 py-2.5 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-                >
-                  <option value="personnel_admin">Personnel Admin</option>
-                  <option value="staff_admin">Staff Admin</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {newUser.role === "super_admin" && "Full access to all features including user management"}
-                  {newUser.role === "personnel_admin" && "Access to dashboard, analytics, reports, and feedback"}
-                  {newUser.role === "staff_admin" && "Access to reports only"}
-                </p>
               </div>
 
               <div>
@@ -563,8 +490,7 @@ export default function UserManagement() {
                     firstName: "",
                     lastName: "",
                     phone: "",
-                    status: "active",
-                    role: "personnel_admin"
+                    status: "active"
                   });
                 }}
               >
@@ -653,26 +579,6 @@ export default function UserManagement() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Role
-                </label>
-                <select
-                  className="border border-gray-300 rounded-lg px-4 py-2.5 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={editUser.role}
-                  onChange={(e) => setEditUser({...editUser, role: e.target.value})}
-                >
-                  <option value="personnel_admin">Personnel Admin</option>
-                  <option value="staff_admin">Staff Admin</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {editUser.role === "super_admin" && "Full access to all features"}
-                  {editUser.role === "personnel_admin" && "Access to dashboard, analytics, reports, and feedback"}
-                  {editUser.role === "staff_admin" && "Access to reports only"}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Account Status
                 </label>
                 <select
@@ -741,4 +647,3 @@ export default function UserManagement() {
     </div>
   );
 }
-       

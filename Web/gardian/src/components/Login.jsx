@@ -22,6 +22,9 @@ export default function Login() {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const navigate = useNavigate();
 
+  // ✅ Define allowed admin roles
+  const ALLOWED_ROLES = ["super_admin", "personnel_admin", "staff_admin"];
+
   // ✅ Initialize reCAPTCHA safely once
   useEffect(() => {
     if (window.recaptchaVerifier) {
@@ -77,19 +80,41 @@ export default function Login() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      console.log("🔑 User authenticated:", user.uid);
 
-      // Get Firestore record for admin
+      // Get Firestore record
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
-      if (!docSnap.exists() || docSnap.data().role !== "admin") {
-        setMessage("❌ Access denied. Admin only.");
+      // ✅ Check if user exists and has an allowed admin role
+      if (!docSnap.exists()) {
+        console.log("❌ User document does not exist in Firestore");
+        setMessage("❌ User data not found.");
         await auth.signOut();
+        await new Promise(res => setTimeout(res, 500));
         setLoading(false);
         return;
       }
 
       const userData = docSnap.data();
+      const userRole = userData.role;
+      
+      console.log("📋 User data from Firestore:", userData);
+      console.log("👤 User role:", userRole);
+      console.log("✅ Allowed roles:", ALLOWED_ROLES);
+      console.log("🔍 Role check result:", ALLOWED_ROLES.includes(userRole));
+
+      // ✅ Check if role is one of the allowed admin roles
+      if (!ALLOWED_ROLES.includes(userRole)) {
+        console.log("❌ Role not in allowed list");
+        setMessage(`❌ Access denied. Your role: ${userRole}. Required: ${ALLOWED_ROLES.join(", ")}`);
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+      
+      console.log("✅ Role check passed!");
+
       const status = userData.status || "active"; // Default to active if no status field
 
       // ✅ Check account status
@@ -117,7 +142,7 @@ export default function Login() {
 
       const phone = userData.phone;
       if (!phone) {
-        setMessage("❌ No phone number registered for this admin.");
+        setMessage("❌ No phone number registered for this account.");
         await auth.signOut();
         setLoading(false);
         return;
@@ -162,7 +187,7 @@ export default function Login() {
       await confirmationResult.confirm(otp);
       console.log("✅ Phone verification successful");
       
-      // sign out from phone auth and re-sign in
+      // sign out from phone auth
       await auth.signOut();
       
       // Re-authenticate with the ORIGINAL credentials
@@ -174,13 +199,33 @@ export default function Login() {
       
       console.log("✅ Re-authenticated with original account:", userCredential.user.uid);
       
-      setMessage("Verified successfully. Redirecting...");
+      setMessage("✅ Verified successfully. Redirecting...");
       
-      // Navigate to dashboard
-      setTimeout(() => {
-        console.log("Navigating to dashboard...");
-        navigate("/", { replace: true });
-      }, 500);
+      // ✅ Wait for UserContext to fetch and set the role
+      const maxWaitTime = 3000; // Maximum 3 seconds
+      const startTime = Date.now();
+      
+      // Poll until role is available in Firestore
+      const waitForRole = async () => {
+        const docRef = doc(db, "users", userCredential.user.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists() && docSnap.data().role) {
+          console.log("✅ Role confirmed in Firestore, navigating...");
+          navigate("/", { replace: true });
+        } else if (Date.now() - startTime < maxWaitTime) {
+          // Keep checking
+          setTimeout(waitForRole, 200);
+        } else {
+          // Fallback: navigate anyway after timeout
+          console.log("⚠️ Timeout waiting for role, navigating anyway...");
+          navigate("/", { replace: true });
+        }
+      };
+      
+      // Small delay to let auth state propagate, then check
+      setTimeout(waitForRole, 500);
+      
     } catch (err) {
       console.error("OTP Error:", err);
       if (err.code === "auth/invalid-verification-code") {
