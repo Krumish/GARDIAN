@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_services.dart';
 import '../services/storage_service.dart';
+import 'report_detail_page.dart';
 
 class ReportHistory extends StatelessWidget {
   const ReportHistory({super.key});
@@ -37,11 +38,12 @@ class ReportHistory extends StatelessWidget {
                 itemCount: uploads.length,
                 padding: const EdgeInsets.all(12),
                 itemBuilder: (context, index) {
-                  final data = uploads[index].data() as Map<String, dynamic>;
+                  final doc = uploads[index];
+                  final data = doc.data() as Map<String, dynamic>;
                   final url = data['url'] as String?;
-                  final reportId = uploads[index].id;
+                  final reportId = doc.id;
 
-                  // 🔹 Workflow status (manual workflow)
+                  // 🔹 Workflow status
                   final status = data['status'] ?? "Pending";
 
                   // 🔹 YOLO detection results
@@ -50,9 +52,13 @@ class ReportHistory extends StatelessWidget {
                   final obstructions = yolo['obstruction_count'] ?? 0;
                   final detectionStatus = yolo['status'] ?? "Unknown";
 
-                  // 🔹 Location
+                  // 🔹 Location / Address
+                  final address = data['address'] ?? "No address";
                   final lat = data['latitude'];
                   final lng = data['longitude'];
+
+                  // 🔹 Optional note
+                  final note = data['note'] ?? "";
 
                   // Status color
                   Color statusColor;
@@ -70,85 +76,99 @@ class ReportHistory extends StatelessWidget {
                       statusColor = Colors.grey;
                   }
 
-                  return Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    margin: const EdgeInsets.only(bottom: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (url != null)
-                          ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12),
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ReportDetailPage(reportId: reportId, data: data),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (url != null)
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(12),
+                              ),
+                              child: Image.network(
+                                url,
+                                height: 150,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
                             ),
-                            child: Image.network(
-                              url,
-                              height: 150,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 🔹 Workflow status badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: statusColor,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  status,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 🔹 Workflow status badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    status,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
+                                const SizedBox(height: 8),
 
-                              // 🔹 YOLO detection info
-                              Text(
-                                "Detected: $drainages drainage(s), $obstructions obstruction(s)",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                "Drainage Status: $detectionStatus",
-                                style: const TextStyle(color: Colors.black54),
-                              ),
-
-                              // 🔹 Location
-                              if (lat != null && lng != null)
+                                // 🔹 YOLO detection info
                                 Text(
-                                  "Location: ($lat, $lng)",
+                                  "Detected: $drainages drainage(s), $obstructions obstruction(s)",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  "Drainage Status: $detectionStatus",
+                                  style: const TextStyle(color: Colors.black54),
+                                ),
+
+                                const SizedBox(height: 6),
+
+                                // 🔹 Address
+                                Text(
+                                  "Address: $address",
                                   style: const TextStyle(
                                     color: Colors.grey,
-                                    fontSize: 12,
+                                    fontSize: 13,
                                   ),
                                 ),
 
-                              // 🔹 Report ID
-                              Text(
-                                "#$reportId",
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
+                                const SizedBox(height: 4),
+
+                                // 🔹 Report ID
+                                Text(
+                                  "#$reportId",
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 11,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 },
