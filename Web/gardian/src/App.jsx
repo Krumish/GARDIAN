@@ -1,7 +1,6 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { db } from "../firebase";
-import { FaClockRotateLeft } from "react-icons/fa6";
 import { collectionGroup, onSnapshot, query, orderBy, limit, getDoc, doc } from "firebase/firestore";
 import { useUser } from "./context/UserContext.jsx";
 
@@ -18,62 +17,74 @@ import UserManagement from "./components/UserManagement";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 // Icons
-import { FaCheckCircle } from "react-icons/fa";
-import { FaUsers } from "react-icons/fa";
+import { FaHistory, FaUsers, FaCheckCircle } from "react-icons/fa";
 import { TbReportOff } from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
 import { MdPending } from "react-icons/md";
 
 export default function App() {
   const location = useLocation();
-  const { user, role, loading } = useUser(); // Use context instead of local state
+  const { user, role, loading } = useUser();
+  const [reports, setReports] = useState([]);
   const [recentReports, setRecentReports] = useState([]);
 
   const isAuthPage =
     location.pathname === "/login" || location.pathname === "/signup";
 
-  // Fetch recent 5 reports (only when user is authenticated)
+  // Fetch all reports for summary cards
   useEffect(() => {
     if (!user || !role) return;
 
-    const uploadsQuery = query(
+    const q = collectionGroup(db, "uploads");
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setReports(data);
+      },
+      (err) => console.error("Error fetching reports:", err)
+    );
+
+    return () => unsubscribe();
+  }, [user, role]);
+
+  // Fetch 5 most recent reports for table
+  useEffect(() => {
+    if (!user || !role) return;
+
+    const recentQuery = query(
       collectionGroup(db, "uploads"),
       orderBy("uploadedAt", "desc"),
       limit(5)
     );
 
-    const unsubscribe = onSnapshot(
-      uploadsQuery,
-      async (snapshot) => {
-        const reports = await Promise.all(
-          snapshot.docs.map(async (uploadDoc) => {
-            const userId = uploadDoc.ref.parent.parent?.id || "unknown";
-            
-            // Fetch user details
-            let userDetails = null;
-            try {
-              const userDoc = await getDoc(doc(db, "users", userId));
-              if (userDoc.exists()) {
-                userDetails = userDoc.data();
-              }
-            } catch (err) {
-              console.error("Error fetching user details:", err);
-            }
+    const unsubscribe = onSnapshot(recentQuery, async (snapshot) => {
+      const recent = await Promise.all(
+        snapshot.docs.map(async (uploadDoc) => {
+          const userId = uploadDoc.ref.parent.parent?.id || "unknown";
 
-            return {
-              id: uploadDoc.id,
-              userId,
-              userDetails,
-              ...uploadDoc.data(),
-            };
-          })
-        );
-        setRecentReports(reports);
-      },
-      (error) => {
-        console.error("❌ Error fetching recent reports:", error);
-      }
-    );
+          // fetch user details
+          let userDetails = null;
+          try {
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (userDoc.exists()) userDetails = userDoc.data();
+          } catch (err) {
+            console.error("Error fetching user details:", err);
+          }
+
+          return {
+            id: uploadDoc.id,
+            userId,
+            userDetails,
+            ...uploadDoc.data(),
+          };
+        })
+      );
+      setRecentReports(recent);
+    });
 
     return () => unsubscribe();
   }, [user, role]);
@@ -92,7 +103,7 @@ export default function App() {
       {!isAuthPage && user && <Sidebar />}
 
       <div className="flex-1 flex flex-col">
-        {/* Topbar fixed at the top */}
+        {/* Topbar */}
         {!isAuthPage && user && (
           <div className="sticky top-0 z-50">
             <Topbar />
@@ -102,39 +113,55 @@ export default function App() {
         {/* Main scrollable content */}
         <main className="flex-1 p-6 overflow-y-auto">
           <Routes>
-            
             {/* Dashboard */}
             <Route
               path="/"
               element={
                 <ProtectedRoute
-                  component={() => <Dashboard recentReports={recentReports} />}
+                  component={() => <Dashboard reports={reports} recentReports={recentReports} />}
                   allowedRoles={["super_admin", "personnel_admin"]}
-              />
-             }
-           />
+                />
+              }
+            />
 
             {/* Auth Pages */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
 
             {/* Other Pages */}
-              <Route
-                 path="/analytics"
-                element={<ProtectedRoute component={Analytics} allowedRoles={["super_admin","personnel_admin"]} />}
-              />
-              <Route
-                 path="/reports"
-                element={<ProtectedRoute component={Reports} allowedRoles={["super_admin","personnel_admin","staff_admin"]} />}
-              />
-              <Route
-                path="/usermanagement"
-               element={<ProtectedRoute component={UserManagement} allowedRoles={["super_admin"]} />}
-              />
-              <Route
-                 path="/feedback"
-               element={<ProtectedRoute component={CitizenFeedback} allowedRoles={["super_admin","personnel_admin"]} />}
-              />
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedRoute
+                  component={Analytics}
+                  allowedRoles={["super_admin", "personnel_admin"]}
+                />
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute
+                  component={Reports}
+                  allowedRoles={["super_admin", "personnel_admin", "staff_admin"]}
+                />
+              }
+            />
+            <Route
+              path="/usermanagement"
+              element={
+                <ProtectedRoute component={UserManagement} allowedRoles={["super_admin"]} />
+              }
+            />
+            <Route
+              path="/feedback"
+              element={
+                <ProtectedRoute
+                  component={CitizenFeedback}
+                  allowedRoles={["super_admin", "personnel_admin"]}
+                />
+              }
+            />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />
@@ -146,28 +173,24 @@ export default function App() {
 }
 
 // ---------------- Dashboard Component ----------------
-function Dashboard({ recentReports }) {
-  // Helper to format date
+function Dashboard({ reports, recentReports }) {
+  const pendingCount = reports.filter((r) => r.status === "Pending").length;
+  const withdrawnCount = reports.filter((r) => r.status === "Withdrawn").length;
+  const resolvedCount = reports.filter((r) => r.status === "Resolved").length;
+  const totalCount = reports.length;
+
   const formatDate = (ts) => {
     if (!ts) return "-";
-    if (ts.toDate) {
-      const date = ts.toDate();
-      return date.toLocaleDateString();
-    }
+    if (ts.toDate) return ts.toDate().toLocaleDateString();
     return ts;
   };
 
-  // Helper to format time
   const formatTime = (ts) => {
     if (!ts) return "-";
-    if (ts.toDate) {
-      const date = ts.toDate();
-      return date.toLocaleTimeString();
-    }
+    if (ts.toDate) return ts.toDate().toLocaleTimeString();
     return ts;
   };
 
-  // Determine infrastructure type based on yolo data
   const getInfrastructureType = (report) => {
     if (report.yolo?.drainage_count > 0) return "Drainage";
     return "Unknown";
@@ -179,15 +202,31 @@ function Dashboard({ recentReports }) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard title="Pending" value="24" icon={<RiHourglassFill className="text-orange-500 w-8 h-8" />} />
-        <StatCard title="Withdrawn" value="12" icon={<TbReportOff className="text-gray-500 w-8 h-8" />} />
-        <StatCard title="Resolved" value="87" icon={<FaClockRotateLeft className="text-green-500 w-8 h-8" />} />
-        <StatCard title="Total Reports" value="123" icon={<FaUsers className="text-blue-500 w-8 h-8" />} />
+        <StatCard
+          title="Pending"
+          value={pendingCount}
+          icon={<RiHourglassFill className="text-orange-500 w-8 h-8" />}
+        />
+        <StatCard
+          title="Withdrawn"
+          value={withdrawnCount}
+          icon={<TbReportOff className="text-gray-500 w-8 h-8" />}
+        />
+        <StatCard
+          title="Resolved"
+          value={resolvedCount}
+          icon={<FaHistory className="text-green-500 w-8 h-8" />}
+        />
+        <StatCard
+          title="Total Reports"
+          value={totalCount}
+          icon={<FaUsers className="text-blue-500 w-8 h-8" />}
+        />
       </div>
 
       {/* Chart */}
       <div className="p-6 bg-white rounded-xl shadow mb-6">
-        <MonthlyReportChart />
+        <MonthlyReportChart reports={reports} />
       </div>
 
       {/* Recent Reports Table */}
