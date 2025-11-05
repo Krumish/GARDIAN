@@ -7,15 +7,26 @@ permissions:
   checks: write
   contents: read
   pull-requests: write
+
 jobs:
   build_and_preview:
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     steps:
+      # Checkout the repo
       - uses: actions/checkout@v4
-      - run: npm ci && npm run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+
+      # Install dependencies and build
+      - name: Install and build
+        run: npm install && npm run build
+        working-directory: ./Web/gardian
+
+      # Deploy to Firebase preview channel
+      - name: Deploy to Firebase preview
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GARDIAN_2D7E5 }}
           projectId: gardian-2d7e5
+          channelId: pr-${{ github.event.pull_request.number }}
+        working-directory: ./Web/gardian
