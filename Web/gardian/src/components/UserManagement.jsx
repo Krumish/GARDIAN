@@ -244,23 +244,23 @@ export default function UserManagement() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Total Admins</h3>
           <p className="text-3xl font-bold mt-2">{users.length}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Super Admins</h3>
           <p className="text-3xl font-bold mt-2 text-purple-500">
             {users.filter(u => u.role === "super_admin").length}
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Personnel Admins</h3>
           <p className="text-3xl font-bold mt-2 text-blue-500">
             {users.filter(u => u.role === "personnel_admin").length}
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Staff Admins</h3>
           <p className="text-3xl font-bold mt-2 text-indigo-500">
             {users.filter(u => u.role === "staff_admin").length}

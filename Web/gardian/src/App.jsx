@@ -205,21 +205,25 @@ function Dashboard({ reports, recentReports }) {
         <StatCard
           title="Pending"
           value={pendingCount}
+          color="text-orange-500"
           icon={<RiHourglassFill className="text-orange-500 w-8 h-8" />}
         />
         <StatCard
           title="Withdrawn"
           value={withdrawnCount}
+          color="text-gray-500"
           icon={<TbReportOff className="text-gray-500 w-8 h-8" />}
         />
         <StatCard
           title="Resolved"
           value={resolvedCount}
+          color="text-green-500"
           icon={<FaHistory className="text-green-500 w-8 h-8" />}
         />
         <StatCard
           title="Total Reports"
           value={totalCount}
+          color="text-blue-500"
           icon={<FaUsers className="text-blue-500 w-8 h-8" />}
         />
       </div>
@@ -235,20 +239,20 @@ function Dashboard({ reports, recentReports }) {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="text-gray-600 text-sm border-b">
-                <th className="py-3 px-4">Report ID</th>
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Location</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Time</th>
-                <th className="py-3 px-4">Status</th>
+              <tr className="bg-gray-100 sticky top-0 z-10 bg-white shadow">
+                <th className="px-4 py-2 font-bold">Report ID</th>
+                <th className="px-4 py-2 font-bold">Name</th>
+                <th className="px-4 py-2 font-bold">Type</th>
+                <th className="px-4 py-2 font-bold">Location</th>
+                <th className="px-4 py-2 font-bold">Date</th>
+                <th className="px-4 py-2 font-bold">Time</th>
+                <th className="px-4 py-2 font-bold">Status</th>
               </tr>
             </thead>
             <tbody>
               {recentReports.length > 0 ? (
                 recentReports.map((report) => (
-                  <tr key={report.id} className="border-b hover:bg-gray-50 text-sm">
+                  <tr key={report.id} className="border-b hover:bg-gray-100 even:bg-gray-50">
                     <td className="py-3 px-4">
                       <span className="font-mono text-xs text-gray-700">
                         {report.id.substring(0, 8)}...
@@ -288,14 +292,16 @@ function Dashboard({ reports, recentReports }) {
 }
 
 // ---------------- Helper Components ----------------
-function StatCard({ title, value, icon }) {
+function StatCard({ title, value, icon, color }) {
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 flex flex-col">
+    <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-sm font-medium text-gray-500">{title}</h3>
         {icon}
       </div>
-      <p className="text-3xl font-bold text-gray-800">{value}</p>
+
+
+      <p className={`text-3xl font-bold ${color}`}>{value}</p>
     </div>
   );
 }
