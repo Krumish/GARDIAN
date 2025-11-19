@@ -21,9 +21,12 @@ export default function Reports() {
   const [showStatusModal, setShowStatusModal] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [showReportModal, setShowReportModal] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [resolvedImage, setResolvedImage] = useState(null)
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [sortBy, setSortBy] = useState("dataDesc");
 
   // Fetch all uploads across all users in real-time
   useEffect(() => {
@@ -85,15 +88,41 @@ export default function Reports() {
   };
 
   // Filtered reports based on search
-  const filteredReports = reports.filter(
-    (r) =>
-      (r.id || "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.userDetails?.firstName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.userDetails?.lastName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.userDetails?.barangay || "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.status || "").toLowerCase().includes(search.toLowerCase()) ||
-      getInfrastructureType(r).toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredReports = reports
+  .filter((r) => {
+    // Search filter
+    const searchText = search.toLowerCase();
+    return (
+      (r.id || "").toLowerCase().includes(searchText) ||
+      (r.userDetails?.firstName || "").toLowerCase().includes(searchText) ||
+      (r.userDetails?.lastName || "").toLowerCase().includes(searchText) ||
+      (r.userDetails?.barangay || "").toLowerCase().includes(searchText) ||
+      (r.status || "").toLowerCase().includes(searchText) ||
+      getInfrastructureType(r).toLowerCase().includes(searchText)
+    );
+    })
+    .filter((r) => {
+      // Status filter
+      return statusFilter ? r.status === statusFilter: true
+    })
+      
+    .filter((r) => {
+      // Type filter
+       return typeFilter ? getInfrastructureType(r) === typeFilter : true
+      })
+
+    .sort((a, b) => {
+      if (sortBy === "dateDesc") {
+        return (b.uploadedAt?.toDate?.() || 0) - (a.uploadedAt?.toDate?.() || 0);
+      } else if (sortBy === "dateAsc") {
+        return (a.uploadedAt?.toDate?.() || 0) - (b.uploadedAt?.toDate?.() || 0);
+      } else if (sortBy === "nameAsc") {
+        return (a.userDetails?.firstName || "").localeCompare(b.userDetails?.firstName || "");
+      } else if (sortBy === "nameDesc") {
+        return (b.userDetails?.firstName || "").localeCompare(a.userDetails?.firstName || "");
+    }
+    return 0;
+    });
 
   // Helper to format date
   const formatDate = (ts) => {
@@ -115,89 +144,98 @@ export default function Reports() {
     return ts;
   };
 
-  // PDF generation function
-  const handleGeneratePDF = () => {
-    if (!selectedMonth || !selectedYear) {
-      alert("Please select a month and year before generating the report.");
-      return;
-    }
+ // PDF generation function
+const handleGeneratePDF = () => {
+  // Validation
+  if (!startDate || !endDate) {
+    alert("Please select a start date and end date before generating the report.");
+    return;
+  }
 
-    const doc = new jsPDF();
-    const monthNames = ["January", "February", "March", "April", "May", "June", 
-                        "July", "August", "September", "October", "November", "December"];
+  if (new Date(startDate) > new Date(endDate)) {
+    alert("Start date cannot be later than end date.");
+    return;
+  }
 
-    // filtered reports
-    const filtered = reports.filter((r) => {
-      if (!r.uploadedAt?.toDate) return false;
-      const date = r.uploadedAt.toDate();
-      return (
-        date.getMonth() + 1 === parseInt(selectedMonth) &&
-        date.getFullYear() === parseInt(selectedYear)
-      );
-    });
+  const doc = new jsPDF();
 
-    if (filtered.length === 0) {
-      alert("No reports found for the selected month/year.");
-      return;
-    }
+  // Convert to Date objects
+  const start = new Date(startDate);
+  const end = new Date(endDate);
 
-    filtered.sort((a, b) => {
+  // Filter reports by date range
+  const filtered = reports.filter((r) => {
+    if (!r.uploadedAt?.toDate) return false;
+    const date = r.uploadedAt.toDate();
+    return date >= start && date <= end;
+  });
+
+  if (filtered.length === 0) {
+    alert("No reports found for the selected date range.");
+    return;
+  }
+
+  // Sort (newest first)
+  filtered.sort((a, b) => {
     const dateA = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(0);
     const dateB = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(0);
-    return dateB - dateA; // newest first
-    });
+    return dateB - dateA;
+  });
 
+  // Title
+  doc.setFontSize(18);
+  doc.setFont(undefined, "bold");
+  doc.text(
+    `Report (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`,
+    14,
+    20
+  );
 
-    // Title
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Monthly Report - ${monthNames[parseInt(selectedMonth) - 1]} ${selectedYear}`, 14, 20);
-    
-    // Generation date
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+  // Generation date
+  doc.setFontSize(10);
+  doc.setFont(undefined, "normal");
+  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
 
-    // Summary table
-    const summary = [
-      ["Total Reports", filtered.length],
-      ["Pending", filtered.filter((r) => r.status === "Pending").length],
-      ["Withdrawn", filtered.filter((r) => r.status === "Withdrawn").length],
-      ["Resolved", filtered.filter((r) => r.status === "Resolved").length],
-      ["Drainage Reports", filtered.filter((r) => r.yolo?.drainage_count > 0).length],
-    ];
+  // Summary table
+  const summary = [
+    ["Total Reports", filtered.length],
+    ["Pending", filtered.filter((r) => r.status === "Pending").length],
+    ["Withdrawn", filtered.filter((r) => r.status === "Withdrawn").length],
+    ["Resolved", filtered.filter((r) => r.status === "Resolved").length],
+    ["Drainage Reports", filtered.filter((r) => r.yolo?.drainage_count > 0).length],
+  ];
 
-    autoTable(doc, {
-      head: [["Metric", "Count"]],
-      body: summary,
-      startY: 35,
-      theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] }
-    });
+  autoTable(doc, {
+    head: [["Metric", "Count"]],
+    body: summary,
+    startY: 35,
+    theme: "striped",
+    headStyles: { fillColor: [59, 130, 246] }
+  });
 
-    // Detailed reports table
-    const tableData = filtered.map((r) => [
-      r.id.substring(0, 8) + "...",
-      `${r.userDetails?.firstName || ""} ${r.userDetails?.lastName || ""}`.trim() || "-",
-      getInfrastructureType(r),
-      r.userDetails?.barangay || "-",
-      r.status || "Pending",
-      r.uploadedAt?.toDate().toLocaleDateString() || "-",
-      r.uploadedAt?.toDate().toLocaleTimeString() || "-",
-    ]);
+  // Detailed reports table
+  const tableData = filtered.map((r) => [
+    r.id.substring(0, 8) + "...",
+    `${r.userDetails?.firstName || ""} ${r.userDetails?.lastName || ""}`.trim() || "-",
+    getInfrastructureType(r),
+    r.userDetails?.barangay || "-",
+    r.status || "Pending",
+    r.uploadedAt?.toDate().toLocaleDateString() || "-",
+    r.uploadedAt?.toDate().toLocaleTimeString() || "-",
+  ]);
 
-    autoTable(doc, {
-      head: [["ID", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
-      body: tableData,
-      startY: doc.lastAutoTable.finalY + 10,
-      theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 8 }
-    });
+  autoTable(doc, {
+    head: [["ID", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
+    body: tableData,
+    startY: doc.lastAutoTable.finalY + 10,
+    theme: "grid",
+    headStyles: { fillColor: [59, 130, 246] },
+    styles: { fontSize: 8 }
+  });
 
-    // Save PDF
-    doc.save(`Report_${monthNames[parseInt(selectedMonth) - 1]}_${selectedYear}.pdf`);
-  };
+  // Save file
+  doc.save(`Report_${startDate}_${endDate}.pdf`);
+};
 
   // Update report status
   const handleUpdateStatus = async () => {
@@ -257,7 +295,7 @@ export default function Reports() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Pending */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Pending</h3>
           <div className="flex items-center mt-2 text-orange-500">
             <RiHourglassFill className="mr-2" />
@@ -268,7 +306,7 @@ export default function Reports() {
         </div>
 
         {/* Withdrawn */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Withdrawn</h3>
           <div className="flex items-center mt-2 text-gray-500">
             <TbReportOff className="mr-2" />
@@ -279,7 +317,7 @@ export default function Reports() {
         </div>
 
         {/* Resolved */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Resolved</h3>
           <div className="flex items-center mt-2 text-green-500">
             <FaClockRotateLeft className="mr-2" />
@@ -290,7 +328,7 @@ export default function Reports() {
         </div>
 
         {/* Total Reports */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col">
+        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
           <h3 className="text-sm text-gray-500">Total Reports</h3>
           <div className="flex items-center mt-2 text-blue-500">
             <FaUsers className="mr-2 w-6 h-6" />
@@ -305,15 +343,47 @@ export default function Reports() {
           <h2 className="text-lg font-semibold">All Reports</h2>
 
           <div className="flex items-center gap-3">
-            {/* Generate PDF Button */}
-            <button
-              className="flex items-center bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
-              onClick={() => setShowReportModal(true)}
-            >
-              <FaFilePdf className="mr-2" /> Generate Report
-            </button>
 
-            {/* Search Bar */}
+            <div className="flex items-center gap-3">
+
+      {/* Status Filter */}
+       <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2"
+       >
+          <option value="">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Resolved">Resolved</option>
+          <option value="Withdrawn">Withdrawn</option>
+        </select>
+
+       {/* Type Filter */}
+        <select
+           value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+           className="border border-gray-300 rounded-lg px-3 py-2"
+        >
+           <option value="">All Types</option>
+          <option value="Drainage">Drainage</option>
+          <option value="Pothole">Pothole</option>
+          <option value="Road Surface">Road Surface</option>
+        </select>
+
+        {/* Sort */}
+          <select
+           value={sortBy}
+           onChange={(e) => setSortBy(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="dateDesc">Date ↓</option>
+            <option value="dateAsc">Date ↑</option>
+            <option value="nameAsc">Name A-Z</option>
+            <option value="nameDesc">Name Z-A</option>
+         </select>
+        </div>
+
+        {/* Search Bar */}
             <div className="relative w-48 sm:w-64">
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
               <input
@@ -324,22 +394,30 @@ export default function Reports() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+
+        {/* Generate PDF Button */}
+            <button
+              className="flex items-center bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+              onClick={() => setShowReportModal(true)}
+            >
+              <FaFilePdf className="mr-2" /> Generate Report
+            </button>
           </div>
         </div>
 
         {/* Reports Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-y-auto max-h-[calc(100vh-4rem)]">
+          <table className="w-full">
             <thead>
-              <tr className="text-gray-600 text-sm border-b">
-                <th className="py-3 px-4">Report ID</th>
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Address</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Time</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Actions</th>
+              <tr className="bg-gray-100 sticky top-0 z-10 bg-white shadow">
+                <th className="px-4 py-2 font-bold">Report ID</th>
+                <th className="px-4 py-2 font-bold">Name</th>
+                <th className="px-4 py-2 font-bold">Type</th>
+                <th className="px-4 py-2 font-bold">Address</th>
+                <th className="px-4 py-2 font-bold">Date</th>
+                <th className="px-4 py-2 font-bold">Time</th>
+                <th className="px-4 py-2 font-bold">Status</th>
+                <th className="px-4 py-2 font-bold">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -438,68 +516,57 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* 📄 Generate Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Generate Monthly Report</h3>
+          {/*  Generate Report Modal */}
+          {showReportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+             <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+               <h3 className="text-xl font-bold mb-4">Generate Monthly Report</h3>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Month</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  <option value="">Select Month</option>
-                  {[
-                    "January", "February", "March", "April", "May", "June",
-                    "July", "August", "September", "October", "November", "December",
-                  ].map((m, i) => (
-                    <option key={i} value={i + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
+           <div className="space-y-4">
 
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Year</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                >
-                  {[2024, 2025, 2026].map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
+             {/* Start Date */}
+            <div>
+          <label className="block text-sm text-gray-600 mb-1">Start Date</label>
+          <input
+            type="date"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            />
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                className="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
-                onClick={() => setShowReportModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
-                onClick={() => {
-                  handleGeneratePDF();
-                  setShowReportModal(false);
-                }}
-              >
-                Generate PDF
-              </button>
-            </div>
-          </div>
+          {/* End Date */}
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">End Date</label>
+          <input
+            type="date"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
         </div>
-      )}
+      </div>
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          className="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
+          onClick={() => setShowReportModal(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+          onClick={() => {
+            handleGeneratePDF();
+            setShowReportModal(false);
+          }}
+        >
+          Generate PDF
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Update Status Modal */}
       {showStatusModal && (
