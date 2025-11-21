@@ -4,7 +4,12 @@ import 'location_page.dart';
 
 class PhotoCapturePage extends StatefulWidget {
   final File imageFile;
-  const PhotoCapturePage({super.key, required this.imageFile});
+  final String issueType;
+  const PhotoCapturePage({
+    super.key,
+    required this.imageFile,
+    required this.issueType,
+  });
 
   @override
   State<PhotoCapturePage> createState() => _PhotoCapturePageState();
@@ -17,7 +22,10 @@ class _PhotoCapturePageState extends State<PhotoCapturePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LocationPage(imageFile: widget.imageFile),
+        builder: (_) => LocationPage(
+          imageFile: widget.imageFile,
+          issueType: widget.issueType,
+        ),
       ),
     );
   }

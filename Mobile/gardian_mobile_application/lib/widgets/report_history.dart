@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:gardian_mobile_application/widgets/report_detail_page.dart';
 import '../services/auth_services.dart';
 import '../services/storage_service.dart';
-import 'report_detail_page.dart';
 
 class ReportHistory extends StatelessWidget {
   const ReportHistory({super.key});
@@ -21,6 +21,7 @@ class ReportHistory extends StatelessWidget {
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
+
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: storageService.getUserUploadsStream(uid!),
@@ -28,6 +29,7 @@ class ReportHistory extends StatelessWidget {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
+
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                 return const Center(child: Text("No reports yet"));
               }
@@ -38,29 +40,17 @@ class ReportHistory extends StatelessWidget {
                 itemCount: uploads.length,
                 padding: const EdgeInsets.all(12),
                 itemBuilder: (context, index) {
-                  final doc = uploads[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final url = data['url'] as String?;
-                  final reportId = doc.id;
-
-                  // 🔹 Workflow status
+                  final data = uploads[index].data() as Map<String, dynamic>;
+                  final url = data['annotatedUrl'] ?? data['url'] as String?;
+                  final reportId = uploads[index].id;
                   final status = data['status'] ?? "Pending";
+                  final issueType = data['issueType'] ?? "Unknown";
+                  final address = data['address'] ?? "";
 
-                  // 🔹 YOLO detection results
                   final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
                   final drainages = yolo['drainage_count'] ?? 0;
                   final obstructions = yolo['obstruction_count'] ?? 0;
-                  final detectionStatus = yolo['status'] ?? "Unknown";
 
-                  // 🔹 Location / Address
-                  final address = data['address'] ?? "No address";
-                  final lat = data['latitude'];
-                  final lng = data['longitude'];
-
-                  // 🔹 Optional note
-                  final note = data['note'] ?? "";
-
-                  // Status color
                   Color statusColor;
                   switch (status) {
                     case "In Progress":
@@ -106,12 +96,13 @@ class ReportHistory extends StatelessWidget {
                                 fit: BoxFit.cover,
                               ),
                             ),
+
                           Padding(
                             padding: const EdgeInsets.all(12),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // 🔹 Workflow status badge
+                                // STATUS LABEL
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -129,39 +120,50 @@ class ReportHistory extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+
                                 const SizedBox(height: 8),
 
-                                // 🔹 YOLO detection info
                                 Text(
-                                  "Detected: $drainages drainage(s), $obstructions obstruction(s)",
+                                  issueType,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 16,
                                   ),
-                                ),
-                                Text(
-                                  "Drainage Status: $detectionStatus",
-                                  style: const TextStyle(color: Colors.black54),
                                 ),
 
                                 const SizedBox(height: 6),
 
-                                // 🔹 Address
-                                Text(
-                                  "Address: $address",
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 13,
+                                // DRAINAGE YOLO ONLY
+                                if (issueType == "Drainage")
+                                  Text(
+                                    "Detected: $drainages drainage(s), $obstructions obstruction(s)",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
 
-                                const SizedBox(height: 4),
+                                if (issueType != "Drainage")
+                                  const Text(
+                                    " ",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
 
-                                // 🔹 Report ID
+                                if (address.isNotEmpty)
+                                  Text(
+                                    address,
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+
+                                const SizedBox(height: 6),
+
                                 Text(
                                   "#$reportId",
                                   style: const TextStyle(
                                     color: Colors.grey,
-                                    fontSize: 11,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ],

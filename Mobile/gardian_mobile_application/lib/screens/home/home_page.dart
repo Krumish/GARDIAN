@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_services.dart';
-import 'report/photo_selection_page.dart';
+import 'report/issue_type_selection_page.dart';
 import '../../widgets/custom_drawer.dart';
 import '../../widgets/report_history.dart';
-import '../../widgets/home_header.dart'; 
+import '../../widgets/home_header.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -47,7 +46,7 @@ class _HomePageState extends State<HomePage> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const PhotoSelectionPage()),
+            MaterialPageRoute(builder: (_) => const IssueTypeSelectionPage()),
           );
         },
         backgroundColor: Colors.green,

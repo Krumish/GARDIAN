@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'analysis_loading_page.dart';
+import 'confirmation_page.dart';
 
 class LocationPage extends StatefulWidget {
   final File imageFile;
-  final Map<String, dynamic>? yoloResults;
+  final String issueType;
 
-  const LocationPage({super.key, required this.imageFile, this.yoloResults});
+  const LocationPage({
+    super.key,
+    required this.imageFile,
+    required this.issueType,
+  });
 
   @override
   State<LocationPage> createState() => _LocationPageState();
@@ -68,31 +73,42 @@ class _LocationPageState extends State<LocationPage> {
   Future<void> _processAndConfirm() async {
     if (_selectedCoordinate == null) return;
 
-    try {
-      setState(() => _processing = true);
+    setState(() => _processing = true);
 
+    // 🔥 RUN YOLO ONLY WHEN DRAINAGE IS SELECTED
+    if (widget.issueType == "Drainage") {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => AnalysisLoadingPage(
             imageFile: widget.imageFile,
             selectedCoordinate: _selectedCoordinate!,
+            issueType: widget.issueType,
           ),
         ),
       );
-    } catch (e) {
-      ScaffoldMessenger.of(
+    } else {
+      // 🔥 SKIP YOLO → GO DIRECTLY TO CONFIRMATION PAGE
+      Navigator.push(
         context,
-      ).showSnackBar(SnackBar(content: Text("Error proceeding: $e")));
-    } finally {
-      setState(() => _processing = false);
+        MaterialPageRoute(
+          builder: (_) => ConfirmationPage(
+            imageFile: widget.imageFile,
+            selectedCoordinate: _selectedCoordinate!,
+            yoloResults: null, // no YOLO for non-drainage
+            issueType: widget.issueType,
+          ),
+        ),
+      );
     }
+
+    setState(() => _processing = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Select Location")),
+      appBar: AppBar(title: Text("Select Location - ${widget.issueType}")),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Stack(
@@ -125,9 +141,7 @@ class _LocationPageState extends State<LocationPage> {
                   child: ElevatedButton.icon(
                     onPressed: _processing ? null : _processAndConfirm,
                     icon: const Icon(Icons.cloud_upload_outlined),
-                    label: Text(
-                      _processing ? "Processing..." : "Continue to Confirm",
-                    ),
+                    label: Text(_processing ? "Processing..." : "Continue"),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),

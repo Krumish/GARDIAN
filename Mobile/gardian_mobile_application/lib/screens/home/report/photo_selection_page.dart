@@ -4,7 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'photo_capture_page.dart';
 
 class PhotoSelectionPage extends StatefulWidget {
-  const PhotoSelectionPage({super.key});
+  final String issueType;
+  const PhotoSelectionPage({super.key, required this.issueType});
 
   @override
   State<PhotoSelectionPage> createState() => _PhotoSelectionPageState();
@@ -19,7 +20,10 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PhotoCapturePage(imageFile: File(image.path)),
+          builder: (_) => PhotoCapturePage(
+            imageFile: File(image.path),
+            issueType: widget.issueType,
+          ),
         ),
       );
     }
@@ -31,7 +35,10 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PhotoCapturePage(imageFile: File(image.path)),
+          builder: (_) => PhotoCapturePage(
+            imageFile: File(image.path),
+            issueType: widget.issueType,
+          ),
         ),
       );
     }
@@ -41,7 +48,7 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Report Drainage Issue"),
+        title: Text("Report: ${widget.issueType}"),
         centerTitle: true,
       ),
       body: Padding(
@@ -56,10 +63,10 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
               color: Colors.blueGrey.shade300,
             ),
             const SizedBox(height: 24),
-            const Text(
-              "Select how you want to upload your photo",
+            Text(
+              "How do you want to add a ${widget.issueType} photo?",
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 48),
             ElevatedButton.icon(

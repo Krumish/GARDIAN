@@ -10,12 +10,14 @@ class ConfirmationPage extends StatefulWidget {
   final File imageFile;
   final LatLng selectedCoordinate;
   final Map<String, dynamic>? yoloResults;
+  final String issueType;
 
   const ConfirmationPage({
     super.key,
     required this.imageFile,
     required this.selectedCoordinate,
     this.yoloResults,
+    required this.issueType,
   });
 
   @override
@@ -29,15 +31,13 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
   Uint8List? _annotatedImageBytes;
 
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _noteController =
-      TextEditingController(); // 🆕 For note input
+  final TextEditingController _noteController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _yoloResults = widget.yoloResults;
 
-    // Decode YOLO annotated image
     if (_yoloResults?["annotated_image"] != null) {
       try {
         _annotatedImageBytes = base64Decode(
@@ -48,7 +48,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
       }
     }
 
-    // Automatically fetch address
     _fetchAddressFromCoordinates();
   }
 
@@ -97,7 +96,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         const SnackBar(content: Text("☁️ Uploading to Firebase...")),
       );
 
-      // Save annotated image temporarily
       File uploadFile = widget.imageFile;
       if (_annotatedImageBytes != null) {
         final tempPath = "${Directory.systemTemp.path}/annotated_upload.jpg";
@@ -111,8 +109,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         lat: widget.selectedCoordinate.latitude,
         lng: widget.selectedCoordinate.longitude,
         address: _locationController.text.trim(),
-        note: _noteController.text.trim(), // 🆕 Include note
+        note: _noteController.text.trim(),
         yoloResults: _yoloResults,
+        issueType: widget.issueType,
       );
 
       ScaffoldMessenger.of(
@@ -133,12 +132,11 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Confirm Upload")),
+      appBar: AppBar(title: Text("Confirm ${widget.issueType} Report")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            // 📷 Image Preview
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: _annotatedImageBytes != null
@@ -154,8 +152,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                     ),
             ),
             const SizedBox(height: 16),
-
-            // 📍 Coordinates
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -171,8 +167,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // 🏠 Address
             TextField(
               controller: _locationController,
               decoration: InputDecoration(
@@ -199,41 +193,44 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
             ),
             const SizedBox(height: 16),
 
-            // YOLO Results
-            // if (_yoloResults != null && _yoloResults!.isNotEmpty)
-            //   Card(
-            //     elevation: 2,
-            //     margin: const EdgeInsets.only(top: 16),
-            //     shape: RoundedRectangleBorder(
-            //       borderRadius: BorderRadius.circular(12),
-            //     ),
-            //     child: Padding(
-            //       padding: const EdgeInsets.all(12.0),
-            //       child: Column(
-            //         crossAxisAlignment: CrossAxisAlignment.start,
-            //         children: [
-            //           const Text(
-            //             "YOLO Detection Results",
-            //             style: TextStyle(
-            //               fontWeight: FontWeight.bold,
-            //               fontSize: 16,
-            //             ),
-            //           ),
-            //           const Divider(),
-            //           Text("Status: ${_yoloResults!["status"]}"),
-            //           Text(
-            //             "Drainages Detected: ${_yoloResults!["drainage_count"]}",
-            //           ),
-            //           Text(
-            //             "Obstructions Detected: ${_yoloResults!["obstruction_count"]}",
-            //           ),
-            //         ],
-            //       ),
-            //     ),
-            //   ),
-            // const SizedBox(height: 20),
+            // YOLO Results card (if present)
+            if (widget.issueType == "Drainage" &&
+                _yoloResults != null &&
+                _yoloResults!.isNotEmpty)
+              Card(
+                elevation: 2,
+                margin: const EdgeInsets.only(top: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "YOLO Detection Results",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Divider(),
+                      Text("Status: ${_yoloResults!["status"]}"),
+                      Text(
+                        "Drainages Detected: ${_yoloResults!["drainage_count"]}",
+                      ),
+                      Text(
+                        "Obstructions Detected: ${_yoloResults!["obstruction_count"]}",
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-            // 📝 Note Section
+            const SizedBox(height: 16),
+
+            // Note
             TextField(
               controller: _noteController,
               maxLines: 3,
@@ -250,7 +247,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 24),
 
-            // ✅ Upload button
             ElevatedButton.icon(
               onPressed: _uploading ? null : () => _uploadToFirebase(context),
               icon: const Icon(Icons.cloud_upload_outlined),
@@ -262,8 +258,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
             ),
 
             const SizedBox(height: 12),
-
-            // ❌ Cancel
             TextButton(
               onPressed: _uploading ? null : () => Navigator.pop(context),
               child: const Text("Cancel"),
