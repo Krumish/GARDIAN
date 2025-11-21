@@ -1,8 +1,8 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { auth, db } from "../firebase";
-import { FaClockRotateLeft } from "react-icons/fa6";
-import { doc, getDoc, collectionGroup, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import { db } from "../firebase";
+import { collectionGroup, onSnapshot, query, orderBy, limit, getDoc, doc } from "firebase/firestore";
+import { useUser } from "./context/UserContext.jsx";
 
 // Components
 import Sidebar from "./components/Sidebar";
@@ -14,116 +14,97 @@ import CitizenFeedback from "./components/CitizenFeedback";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import UserManagement from "./components/UserManagement";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 // Icons
-import { FaCheckCircle, FaClipboardList } from "react-icons/fa";
-import { FaUsers } from "react-icons/fa";
+import { FaHistory, FaUsers, FaCheckCircle } from "react-icons/fa";
 import { TbReportOff } from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
 import { MdPending } from "react-icons/md";
 
 export default function App() {
   const location = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { user, role, loading } = useUser();
+  const [reports, setReports] = useState([]);
   const [recentReports, setRecentReports] = useState([]);
 
   const isAuthPage =
     location.pathname === "/login" || location.pathname === "/signup";
 
-  // Check Firebase auth & admin role
+  // Fetch all reports for summary cards
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        try {
-          const docRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists() && docSnap.data().role === "admin") {
-            setIsAuthenticated(true);
-            setIsAdmin(true);
-          } else {
-            setIsAuthenticated(false);
-            setIsAdmin(false);
-            auth.signOut();
-          }
-        } catch (err) {
-          console.error(err);
-          setIsAuthenticated(false);
-          setIsAdmin(false);
-        }
-      } else {
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-      }
-      setLoading(false);
-    });
+    if (!user || !role) return;
+
+    const q = collectionGroup(db, "uploads");
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setReports(data);
+      },
+      (err) => console.error("Error fetching reports:", err)
+    );
 
     return () => unsubscribe();
-  }, []);
+  }, [user, role]);
 
-  // Fetch recent 5 reports
+  // Fetch 5 most recent reports for table
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user || !isAdmin) return;
+    if (!user || !role) return;
 
-    const uploadsQuery = query(
+    const recentQuery = query(
       collectionGroup(db, "uploads"),
       orderBy("uploadedAt", "desc"),
       limit(5)
     );
 
-    const unsubscribe = onSnapshot(
-      uploadsQuery,
-      async (snapshot) => {
-        const reports = await Promise.all(
-          snapshot.docs.map(async (uploadDoc) => {
-            const userId = uploadDoc.ref.parent.parent?.id || "unknown";
-            
-            // Fetch user details
-            let userDetails = null;
-            try {
-              const userDoc = await getDoc(doc(db, "users", userId));
-              if (userDoc.exists()) {
-                userDetails = userDoc.data();
-              }
-            } catch (err) {
-              console.error("Error fetching user details:", err);
-            }
+    const unsubscribe = onSnapshot(recentQuery, async (snapshot) => {
+      const recent = await Promise.all(
+        snapshot.docs.map(async (uploadDoc) => {
+          const userId = uploadDoc.ref.parent.parent?.id || "unknown";
 
-            return {
-              id: uploadDoc.id,
-              userId,
-              userDetails,
-              ...uploadDoc.data(),
-            };
-          })
-        );
-        setRecentReports(reports);
-      },
-      (error) => {
-        console.error("❌ Error fetching recent reports:", error);
-      }
-    );
+          // fetch user details
+          let userDetails = null;
+          try {
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (userDoc.exists()) userDetails = userDoc.data();
+          } catch (err) {
+            console.error("Error fetching user details:", err);
+          }
+
+          return {
+            id: uploadDoc.id,
+            userId,
+            userDetails,
+            ...uploadDoc.data(),
+          };
+        })
+      );
+      setRecentReports(recent);
+    });
 
     return () => unsubscribe();
-  }, [isAdmin]);
+  }, [user, role]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen text-xl font-semibold">
         Loading...
       </div>
     );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      {!isAuthPage && <Sidebar />}
+      {!isAuthPage && user && <Sidebar />}
 
       <div className="flex-1 flex flex-col">
-        {/* Topbar fixed at the top */}
-        {!isAuthPage && (
+        {/* Topbar */}
+        {!isAuthPage && user && (
           <div className="sticky top-0 z-50">
             <Topbar />
           </div>
@@ -136,11 +117,10 @@ export default function App() {
             <Route
               path="/"
               element={
-                isAuthenticated && isAdmin ? (
-                  <Dashboard recentReports={recentReports} />
-                ) : (
-                  <Navigate to="/login" replace />
-                )
+                <ProtectedRoute
+                  component={() => <Dashboard reports={reports} recentReports={recentReports} />}
+                  allowedRoles={["super_admin", "personnel_admin"]}
+                />
               }
             />
 
@@ -151,19 +131,36 @@ export default function App() {
             {/* Other Pages */}
             <Route
               path="/analytics"
-              element={isAdmin ? <Analytics /> : <Navigate to="/login" replace />}
+              element={
+                <ProtectedRoute
+                  component={Analytics}
+                  allowedRoles={["super_admin", "personnel_admin"]}
+                />
+              }
             />
             <Route
               path="/reports"
-              element={isAdmin ? <Reports /> : <Navigate to="/login" replace />}
+              element={
+                <ProtectedRoute
+                  component={Reports}
+                  allowedRoles={["super_admin", "personnel_admin", "staff_admin"]}
+                />
+              }
             />
             <Route
               path="/usermanagement"
-              element={isAdmin ? <UserManagement /> : <Navigate to="/login" replace />}
+              element={
+                <ProtectedRoute component={UserManagement} allowedRoles={["super_admin"]} />
+              }
             />
             <Route
               path="/feedback"
-              element={isAdmin ? <CitizenFeedback /> : <Navigate to="/login" replace />}
+              element={
+                <ProtectedRoute
+                  component={CitizenFeedback}
+                  allowedRoles={["super_admin", "personnel_admin"]}
+                />
+              }
             />
 
             {/* Fallback */}
@@ -176,28 +173,24 @@ export default function App() {
 }
 
 // ---------------- Dashboard Component ----------------
-function Dashboard({ recentReports }) {
-  // Helper to format date
+function Dashboard({ reports, recentReports }) {
+  const pendingCount = reports.filter((r) => r.status === "Pending").length;
+  const withdrawnCount = reports.filter((r) => r.status === "Withdrawn").length;
+  const resolvedCount = reports.filter((r) => r.status === "Resolved").length;
+  const totalCount = reports.length;
+
   const formatDate = (ts) => {
     if (!ts) return "-";
-    if (ts.toDate) {
-      const date = ts.toDate();
-      return date.toLocaleDateString();
-    }
+    if (ts.toDate) return ts.toDate().toLocaleDateString();
     return ts;
   };
 
-  // Helper to format time
   const formatTime = (ts) => {
     if (!ts) return "-";
-    if (ts.toDate) {
-      const date = ts.toDate();
-      return date.toLocaleTimeString();
-    }
+    if (ts.toDate) return ts.toDate().toLocaleTimeString();
     return ts;
   };
 
-  // Determine infrastructure type based on yolo data
   const getInfrastructureType = (report) => {
     if (report.yolo?.drainage_count > 0) return "Drainage";
     return "Unknown";
@@ -209,15 +202,35 @@ function Dashboard({ recentReports }) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard title="Pending" value="24" icon={<RiHourglassFill className="text-orange-500 w-8 h-8" />} />
-        <StatCard title="Withdrawn" value="12" icon={<TbReportOff className="text-gray-500 w-8 h-8" />} />
-        <StatCard title="Resolved" value="87" icon={<FaClockRotateLeft className="text-green-500 w-8 h-8" />} />
-        <StatCard title="Total Reports" value="123" icon={<FaUsers className="text-blue-500 w-8 h-8" />} />
+        <StatCard
+          title="Pending"
+          value={pendingCount}
+          color="text-orange-500"
+          icon={<RiHourglassFill className="text-orange-500 w-8 h-8" />}
+        />
+        <StatCard
+          title="Withdrawn"
+          value={withdrawnCount}
+          color="text-gray-500"
+          icon={<TbReportOff className="text-gray-500 w-8 h-8" />}
+        />
+        <StatCard
+          title="Resolved"
+          value={resolvedCount}
+          color="text-green-500"
+          icon={<FaHistory className="text-green-500 w-8 h-8" />}
+        />
+        <StatCard
+          title="Total Reports"
+          value={totalCount}
+          color="text-blue-500"
+          icon={<FaUsers className="text-blue-500 w-8 h-8" />}
+        />
       </div>
 
       {/* Chart */}
       <div className="p-6 bg-white rounded-xl shadow mb-6">
-        <MonthlyReportChart />
+        <MonthlyReportChart reports={reports} />
       </div>
 
       {/* Recent Reports Table */}
@@ -226,20 +239,20 @@ function Dashboard({ recentReports }) {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="text-gray-600 text-sm border-b">
-                <th className="py-3 px-4">Report ID</th>
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Location</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Time</th>
-                <th className="py-3 px-4">Status</th>
+              <tr className="bg-gray-100 sticky top-0 z-10 bg-white shadow">
+                <th className="px-4 py-2 font-bold">Report ID</th>
+                <th className="px-4 py-2 font-bold">Name</th>
+                <th className="px-4 py-2 font-bold">Type</th>
+                <th className="px-4 py-2 font-bold">Location</th>
+                <th className="px-4 py-2 font-bold">Date</th>
+                <th className="px-4 py-2 font-bold">Time</th>
+                <th className="px-4 py-2 font-bold">Status</th>
               </tr>
             </thead>
             <tbody>
               {recentReports.length > 0 ? (
                 recentReports.map((report) => (
-                  <tr key={report.id} className="border-b hover:bg-gray-50 text-sm">
+                  <tr key={report.id} className="border-b hover:bg-gray-100 even:bg-gray-50">
                     <td className="py-3 px-4">
                       <span className="font-mono text-xs text-gray-700">
                         {report.id.substring(0, 8)}...
@@ -279,14 +292,16 @@ function Dashboard({ recentReports }) {
 }
 
 // ---------------- Helper Components ----------------
-function StatCard({ title, value, icon }) {
+function StatCard({ title, value, icon, color }) {
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 flex flex-col">
+    <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-sm font-medium text-gray-500">{title}</h3>
         {icon}
       </div>
-      <p className="text-3xl font-bold text-gray-800">{value}</p>
+
+
+      <p className={`text-3xl font-bold ${color}`}>{value}</p>
     </div>
   );
 }
