@@ -32,19 +32,9 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
   Future<void> _runAnalysis() async {
     try {
-      // 🚨 Should never be called for non-drainage
+      // 🚫 Skip YOLO for non-drainage issues
       if (widget.issueType != "Drainage") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ConfirmationPage(
-              imageFile: widget.imageFile,
-              selectedCoordinate: widget.selectedCoordinate,
-              yoloResults: null,
-              issueType: widget.issueType,
-            ),
-          ),
-        );
+        _goToConfirmation(null);
         return;
       }
 
@@ -52,31 +42,55 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
       if (!mounted) return;
 
+      // Validate YOLO Status
+      if (results["status"] != "success") {
+        return _triggerError("Unable to analyze the image.");
+      }
+
+      final drainageCount = results["drainage_count"] ?? 0;
+      final obstructionCount = results["obstruction_count"] ?? 0;
+
+      // ❗ No detections = block submission
+      if (drainageCount == 0 && obstructionCount == 0) {
+        return _triggerError(
+          "No drainage or obstruction detected.\nPlease upload a clearer image.",
+        );
+      }
+
+      // If valid → pass results
       final yoloSummary = {
         "status": results["status"],
-        "drainage_count": results["drainage_count"],
-        "obstruction_count": results["obstruction_count"],
+        "drainage_count": drainageCount,
+        "obstruction_count": obstructionCount,
         "annotated_image": results["annotated_image"],
       };
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ConfirmationPage(
-            imageFile: widget.imageFile,
-            selectedCoordinate: widget.selectedCoordinate,
-            yoloResults: yoloSummary,
-            issueType: widget.issueType,
-          ),
-        ),
-      );
+      _goToConfirmation(yoloSummary);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _isError = true;
-        _errorMessage = "We couldn't analyze the drainage image.";
-      });
+      _triggerError("Invalid or unreadable image.");
     }
+  }
+
+  void _goToConfirmation(Map<String, dynamic>? yoloResults) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ConfirmationPage(
+          imageFile: widget.imageFile,
+          selectedCoordinate: widget.selectedCoordinate,
+          yoloResults: yoloResults,
+          issueType: widget.issueType,
+        ),
+      ),
+    );
+  }
+
+  void _triggerError(String message) {
+    setState(() {
+      _isError = true;
+      _errorMessage = message;
+    });
   }
 
   @override
@@ -95,8 +109,24 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
                 Text(
                   _errorMessage ?? "Something went wrong.",
                   textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
+
+                // Retry button
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isError = false;
+                    });
+                    _runAnalysis();
+                  },
+                  child: const Text("Retry"),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Go Back button
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text("Go Back"),
