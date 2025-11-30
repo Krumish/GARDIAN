@@ -48,8 +48,4 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icons/GARDIAN.png
-    - assets/icons/GARDIAN_LOGO.png
-    - assets/icons/GARDIAN_TEXT.png
-    - assets/icons/user_avatar.png
-    - assets/icons/otp.png
+    - assets/icons/
