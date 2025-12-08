@@ -42,24 +42,24 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
       if (!mounted) return;
 
-      // Validate YOLO Status
-      if (results["status"] != "success") {
+      // ❗ Backend error?
+      if (results.containsKey("error")) {
         return _triggerError("Unable to analyze the image.");
       }
 
       final drainageCount = results["drainage_count"] ?? 0;
       final obstructionCount = results["obstruction_count"] ?? 0;
 
-      // ❗ No detections = block submission
+      // ❗ No detection at all
       if (drainageCount == 0 && obstructionCount == 0) {
         return _triggerError(
           "No drainage or obstruction detected.\nPlease upload a clearer image.",
         );
       }
 
-      // If valid → pass results
+      // 🟢 Build YOLO summary
       final yoloSummary = {
-        "status": results["status"],
+        "status": results["status"], // now allowed (Clogged, Clear, etc.)
         "drainage_count": drainageCount,
         "obstruction_count": obstructionCount,
         "annotated_image": results["annotated_image"],
