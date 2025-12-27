@@ -3,10 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'services/auth_services.dart';
 import 'screens/home/home_page.dart';
 import 'screens/auth/login_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});

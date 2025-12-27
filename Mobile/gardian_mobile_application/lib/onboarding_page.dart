@@ -62,15 +62,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: _finishOnboarding,
-                child: const Text("Skip"),
-              ),
-            ),
-
             Expanded(
               child: PageView.builder(
                 controller: _controller,
@@ -90,7 +81,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   height: 10,
                   width: current == i ? 24 : 10,
                   decoration: BoxDecoration(
-                    color: current == i ? Colors.green : Colors.grey[300],
+                    color: current == i ? Colors.black : Colors.grey[300],
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
@@ -99,14 +90,27 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
             const SizedBox(height: 18),
 
-            ElevatedButton(
-              onPressed: current == pages.length - 1
-                  ? _finishOnboarding
-                  : () => _controller.nextPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    ),
-              child: Text(current == pages.length - 1 ? "Get Started" : "Next"),
+            SizedBox(
+              width: 150,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: current == pages.length - 1
+                    ? _finishOnboarding
+                    : () => _controller.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      ),
+                child: Text(
+                  current == pages.length - 1 ? "Get Started" : "Next",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
             ),
 
             const SizedBox(height: 24),
