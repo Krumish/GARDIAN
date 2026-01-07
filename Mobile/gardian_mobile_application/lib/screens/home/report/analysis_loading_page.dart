@@ -47,21 +47,20 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
         return _triggerError("Unable to analyze the image.");
       }
 
-      final drainageCount = results["drainage_count"] ?? 0;
-      final obstructionCount = results["obstruction_count"] ?? 0;
+      final drainageList = results["drainage"] as List? ?? [];
+      final obstructionList = results["obstructions"] as List? ?? [];
 
-      // ❗ No detection at all
-      if (drainageCount == 0 && obstructionCount == 0) {
+      // no objects detected at all
+      if (drainageList.isEmpty && obstructionList.isEmpty) {
         return _triggerError(
           "No drainage or obstruction detected.\nPlease upload a clearer image.",
         );
       }
 
-      // 🟢 Build YOLO summary
       final yoloSummary = {
-        "status": results["status"], // now allowed (Clogged, Clear, etc.)
-        "drainage_count": drainageCount,
-        "obstruction_count": obstructionCount,
+        "status": results["status"],
+        "drainage": drainageList,
+        "obstructions": obstructionList,
         "annotated_image": results["annotated_image"],
       };
 

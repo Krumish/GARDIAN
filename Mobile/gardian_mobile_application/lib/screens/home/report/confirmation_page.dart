@@ -54,7 +54,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
   Future<void> _fetchAddressFromCoordinates() async {
     setState(() => _isFetchingAddress = true);
     try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
+      final placemarks = await placemarkFromCoordinates(
         widget.selectedCoordinate.latitude,
         widget.selectedCoordinate.longitude,
       );
@@ -69,9 +69,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
           p.country,
         ].where((e) => e != null && e!.isNotEmpty).join(", ");
 
-        setState(() {
-          _locationController.text = formatted;
-        });
+        setState(() => _locationController.text = formatted);
       }
     } catch (e) {
       debugPrint("⚠️ Failed to get address: $e");
@@ -97,6 +95,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
       );
 
       File uploadFile = widget.imageFile;
+
       if (_annotatedImageBytes != null) {
         final tempPath = "${Directory.systemTemp.path}/annotated_upload.jpg";
         final tempFile = File(tempPath);
@@ -105,7 +104,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
       }
 
       await storageService.uploadUserImage(
-        uploadFile,
+        widget.imageFile, // 🔹 always the ORIGINAL image
+        annotatedImageBytes:
+            _annotatedImageBytes, // 🔹 pass annotated separately
         lat: widget.selectedCoordinate.latitude,
         lng: widget.selectedCoordinate.longitude,
         address: _locationController.text.trim(),
@@ -114,13 +115,12 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         issueType: widget.issueType,
       );
 
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("✅ Upload successful!")));
 
-      if (mounted) {
-        Navigator.popUntil(context, (route) => route.isFirst);
-      }
+      if (mounted) Navigator.popUntil(context, (route) => route.isFirst);
     } catch (e) {
       setState(() => _uploading = false);
       ScaffoldMessenger.of(
@@ -131,10 +131,13 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final drainage = (_yoloResults?["drainage"] as List?) ?? [];
+    final obstructions = (_yoloResults?["obstructions"] as List?) ?? [];
+
     return Scaffold(
       appBar: AppBar(title: Text("Confirm ${widget.issueType} Report")),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
             ClipRRect(
@@ -151,7 +154,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                       fit: BoxFit.cover,
                     ),
             ),
+
             const SizedBox(height: 16),
+
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -166,7 +171,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                 ),
               ),
             ),
+
             const SizedBox(height: 16),
+
             TextField(
               controller: _locationController,
               decoration: InputDecoration(
@@ -178,7 +185,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                 prefixIcon: const Icon(Icons.location_on_outlined),
                 suffixIcon: _isFetchingAddress
                     ? const Padding(
-                        padding: EdgeInsets.all(12.0),
+                        padding: EdgeInsets.all(12),
                         child: SizedBox(
                           width: 20,
                           height: 20,
@@ -191,20 +198,20 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                       ),
               ),
             ),
+
             const SizedBox(height: 16),
 
-            // YOLO Results card (if present)
+            // 🔥 NEW: Object-based YOLO results
             if (widget.issueType == "Drainage" &&
                 _yoloResults != null &&
                 _yoloResults!.isNotEmpty)
               Card(
                 elevation: 2,
-                margin: const EdgeInsets.only(top: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -216,13 +223,13 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                         ),
                       ),
                       const Divider(),
-                      Text("Status: ${_yoloResults!["status"]}"),
-                      Text(
-                        "Drainages Detected: ${_yoloResults!["drainage_count"]}",
-                      ),
-                      Text(
-                        "Obstructions Detected: ${_yoloResults!["obstruction_count"]}",
-                      ),
+
+                      Text("Status: ${_yoloResults!["status"] ?? "Unknown"}"),
+
+                      const SizedBox(height: 8),
+
+                      Text("Obstructions (${obstructions.length})"),
+                      ...obstructions.map((o) => Text("• ${o["class"]}")),
                     ],
                   ),
                 ),
@@ -230,7 +237,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 16),
 
-            // Note
             TextField(
               controller: _noteController,
               maxLines: 3,
@@ -258,6 +264,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
             ),
 
             const SizedBox(height: 12),
+
             TextButton(
               onPressed: _uploading ? null : () => Navigator.pop(context),
               child: const Text("Cancel"),

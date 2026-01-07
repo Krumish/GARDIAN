@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
@@ -11,6 +12,7 @@ class StorageService {
 
   Future<void> uploadUserImage(
     File file, {
+    Uint8List? annotatedImageBytes,
     Map<String, dynamic>? yoloResults,
     double? lat,
     double? lng,
@@ -24,21 +26,23 @@ class StorageService {
     final uploadId = const Uuid().v4();
 
     final ref = _storage.ref().child("user_uploads/$uid/$uploadId.jpg");
-
     await ref.putFile(file);
     final url = await ref.getDownloadURL();
 
     String? annotatedUrl;
-    if (yoloResults != null && yoloResults["annotated_image"] != null) {
+
+    // 🔹 upload annotated ONLY if present
+    if (annotatedImageBytes != null) {
       try {
-        final annotatedBytes = base64Decode(yoloResults["annotated_image"]);
         final annotatedRef = _storage.ref().child(
           "user_uploads/$uid/${uploadId}_annotated.jpg",
         );
+
         await annotatedRef.putData(
-          annotatedBytes,
+          annotatedImageBytes,
           SettableMetadata(contentType: "image/jpeg"),
         );
+
         annotatedUrl = await annotatedRef.getDownloadURL();
       } catch (e) {
         // ignore annotated upload failure
