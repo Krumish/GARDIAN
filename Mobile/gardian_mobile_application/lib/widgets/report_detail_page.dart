@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-class ReportDetailPage extends StatelessWidget {
+class ReportDetailPage extends StatefulWidget {
   final String reportId;
   final Map<String, dynamic> data;
 
@@ -13,30 +13,62 @@ class ReportDetailPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final url = data['annotatedUrl'] ?? data['url'];
-    final issueType = data['issueType'] ?? "Unknown";
-    final address = data['address'] ?? "";
-    final note = data['note'] ?? "";
+  State<ReportDetailPage> createState() => _ReportDetailPageState();
+}
 
-    final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
-    final lat = data['latitude'];
-    final lng = data['longitude'];
+class _ReportDetailPageState extends State<ReportDetailPage> {
+  bool showAnnotated = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalUrl = widget.data['url'];
+    final annotatedUrl = widget.data['annotatedUrl'];
+    final issueType = widget.data['issueType'] ?? "Unknown";
+    final address = widget.data['address'] ?? "";
+    final note = widget.data['note'] ?? "";
+    final yolo = widget.data['yolo'] as Map<String, dynamic>? ?? {};
+    final lat = widget.data['latitude'];
+    final lng = widget.data['longitude'];
 
     return Scaffold(
       appBar: AppBar(title: const Text("Report Details")),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          if (url != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                url,
-                height: 220,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+          if (normalUrl != null)
+            Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    showAnnotated && annotatedUrl != null
+                        ? annotatedUrl
+                        : normalUrl,
+                    height: 220,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+
+                if (annotatedUrl != null)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() => showAnnotated = false);
+                        },
+                        child: const Text("Normal"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() => showAnnotated = true);
+                        },
+                        child: const Text("Annotated"),
+                      ),
+                    ],
+                  ),
+              ],
             ),
 
           const SizedBox(height: 12),
@@ -51,7 +83,7 @@ class ReportDetailPage extends StatelessWidget {
                 address.isNotEmpty ? address : "No address provided",
               ),
               trailing: Text(
-                "#$reportId",
+                "#${widget.reportId}",
                 style: const TextStyle(color: Colors.grey),
               ),
             ),
@@ -72,8 +104,9 @@ class ReportDetailPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text("Status: ${yolo['status'] ?? 'Unknown'}"),
-                    Text("Drainages: ${yolo['drainage_count'] ?? 0}"),
-                    Text("Obstructions: ${yolo['obstruction_count'] ?? 0}"),
+                    Text(
+                      "Obstructions: ${(yolo['obstructions'] as List?)?.length ?? 0}",
+                    ),
                   ],
                 ),
               ),
@@ -114,7 +147,7 @@ class ReportDetailPage extends StatelessWidget {
                     ),
                     markers: {
                       Marker(
-                        markerId: MarkerId(reportId),
+                        markerId: MarkerId(widget.reportId),
                         position: LatLng(lat as double, lng as double),
                       ),
                     },

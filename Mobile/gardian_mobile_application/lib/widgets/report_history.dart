@@ -41,7 +41,7 @@ class ReportHistory extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 itemBuilder: (context, index) {
                   final data = uploads[index].data() as Map<String, dynamic>;
-                  final url = data['annotatedUrl'] ?? data['url'] as String?;
+                  final url = data['url'] ?? data['url'] as String?;
                   final reportId = uploads[index].id;
                   final status = data['status'] ?? "Pending";
                   final issueType = data['issueType'] ?? "Unknown";
