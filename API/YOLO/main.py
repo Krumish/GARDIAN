@@ -5,8 +5,9 @@ import shutil, os, base64, cv2, uuid
 
 app = FastAPI()
 
-# ✅ Load YOLO model once (avoid reloading every request)
+# ✅ Load YOLO model once
 model = YOLO("v4.pt")
+
 
 @app.post("/detect/")
 async def detect(file: UploadFile = File(...)):
@@ -16,44 +17,56 @@ async def detect(file: UploadFile = File(...)):
         with open(temp_name, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # 🔹 Run YOLO detection
+        # 🔎 Run YOLO
         results = model(temp_name)
 
         drainage_boxes = []
         obstruction_boxes = []
+
+        # 🆕 Detailed lists
+        detected_drainage = []
+        detected_obstructions = []
+
         boxes = []
 
-        # 🔹 Draw bounding boxes on image
-        annotated_image = results[0].plot()  # numpy array
+        # 🖍 Draw bounding boxes
+        annotated_image = results[0].plot()
 
-        # Extract detections
+        # 🔍 Extract detections
         for r in results:
             for box in r.boxes:
                 cls = r.names[int(box.cls)].lower()
                 conf = float(box.conf)
                 xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
 
-                boxes.append({
+                obj = {
                     "class": cls,
-                    "confidence": conf,
+                    "confidence": round(conf, 3),
                     "box": xyxy
-                })
+                }
 
+                boxes.append(obj)
+
+                # Drainages
                 if cls == "drainages":
+                    detected_drainage.append(obj)
                     drainage_boxes.append(xyxy)
+
+                # Obstructions
                 elif cls in ["trash", "leaves", "rocks", "silt", "cracks", "manhole"]:
+                    detected_obstructions.append(obj)
                     obstruction_boxes.append(xyxy)
 
-        # ✅ Count valid obstructions (inside or overlapping a drainage box)
+        # ✅ Count valid obstructions (overlapping drainage)
         valid_obstructions = 0
         for obs in obstruction_boxes:
             if any(overlaps(obs, dr) for dr in drainage_boxes):
                 valid_obstructions += 1
 
-        # ✅ Determine status
-        drainage_count = len(drainage_boxes)
+        drainage_count = len(detected_drainage)
         obstruction_count = valid_obstructions
 
+        # 🚦 Determine status
         if drainage_count == 0:
             status = "No Drainage Detected"
         elif obstruction_count > 2:
@@ -63,43 +76,49 @@ async def detect(file: UploadFile = File(...)):
         else:
             status = "Clear"
 
-        # 🔹 Convert annotated image to base64
+        # 🖼 Convert annotated image
         _, buffer = cv2.imencode(".jpg", annotated_image)
         encoded_image = base64.b64encode(buffer).decode("utf-8")
 
-        # Clean up
+        # Cleanup
         if os.path.exists(temp_name):
             os.remove(temp_name)
 
         return JSONResponse({
+            "status": status,
+
+            # ➜ Summary
             "drainage_count": drainage_count,
             "obstruction_count": obstruction_count,
-            "status": status,
+
+            # ➜ Detailed objects
+            "drainage": detected_drainage,
+            "obstructions": detected_obstructions,
+
+            # ➜ Raw boxes list (everything)
             "boxes": boxes,
-            "annotated_image": encoded_image
+
+            # ➜ Annotated preview
+            "annotated_image": encoded_image,
         })
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# 🧠 Helper function to check if two boxes overlap
+# 🧠 Overlap helper
 def overlaps(box1, box2):
     x1, y1, x2, y2 = box1
     a1, b1, a2, b2 = box2
 
-    # Calculate intersection
     inter_x1 = max(x1, a1)
     inter_y1 = max(y1, b1)
     inter_x2 = min(x2, a2)
     inter_y2 = min(y2, b2)
 
     if inter_x1 < inter_x2 and inter_y1 < inter_y2:
-        # There is an overlap
         intersection_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)
         box1_area = (x2 - x1) * (y2 - y1)
-
-        # If at least 10% of obstruction overlaps with drainage, consider it inside
         return intersection_area / box1_area > 0.1
 
     return False
