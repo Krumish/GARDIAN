@@ -124,6 +124,124 @@ export default function Reports() {
     return 0;
     });
 
+  const loadImage = (src) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.src = src;
+  });
+
+const addHeader = (doc, start, end) => {
+  // === LOAD IMAGES ===
+  const caintaSeal = "/cainta-seal.png";
+  const menroLogo = "/menro-logo.png";
+
+  // === LEFT SEAL ===
+  doc.addImage(
+    caintaSeal,
+    "PNG",
+    18,  // x
+    10,  // y
+    24,  // width
+    24   // height
+  );
+
+  // === RIGHT LOGO ===
+  doc.addImage(
+    menroLogo,
+    "PNG",
+    168,
+    10,
+    24,
+    24
+  );
+
+  // === CENTER HEADER TEXT ===
+  doc.setTextColor(0);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text("REPUBLIC OF THE PHILIPPINES", 105, 12, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Province of Rizal", 105, 16, { align: "center" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("MUNICIPALITY OF CAINTA", 105, 21, { align: "center" });
+
+  doc.setFontSize(9);
+  doc.setTextColor(30, 64, 175);
+  doc.text(
+    "OFFICE OF THE MUNICIPAL ENVIRONMENT AND NATURAL RESOURCES (MENRO)",
+    105,
+    26,
+    { align: "center" }
+  );
+
+  doc.setFontSize(7);
+  doc.setTextColor(100);
+  doc.text(
+    "Cainta Municipal Hall, Bonifacio Ave, Sto. Domingo, Cainta, Rizal",
+    105,
+    30,
+    { align: "center" }
+  );
+
+  // === DIVIDER LINE ===
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.8);
+  doc.line(14, 36, 196, 36);
+
+  // === REPORT TITLE ===
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(0);
+  doc.text(
+    "INFRASTRUCTURE & ENVIRONMENTAL REPORTS SUMMARY",
+    105,
+    44,
+    { align: "center" }
+  );
+
+  // === DATE RANGE ===
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(
+    `Reporting Period: ${start.toLocaleDateString()} – ${end.toLocaleDateString()}`,
+    14,
+    50
+  );
+};
+
+const addFooter = (doc) => {
+  const pageSize = doc.internal.pageSize;
+  const pageHeight = pageSize.height || pageSize.getHeight();
+
+  // Footer line
+  doc.setLineWidth(0.5);
+  doc.line(14, pageHeight - 20, 196, pageHeight - 20);
+
+  doc.setFontSize(8);
+  doc.setTextColor(80);
+
+  // Left footer
+  doc.text(
+    "MENRO – Municipality of Cainta | Official Report",
+    14,
+    pageHeight - 12
+  );
+
+  // Right footer (page number)
+  doc.text(
+    `Page ${doc.internal.getCurrentPageInfo().pageNumber}`,
+    196,
+    pageHeight - 12,
+    { align: "right" }
+  );
+};
+
   // Helper to format date
   const formatDate = (ts) => {
     if (!ts) return "-";
@@ -143,6 +261,7 @@ export default function Reports() {
     }
     return ts;
   };
+
 
  // PDF generation function
 const handleGeneratePDF = () => {
@@ -182,20 +301,6 @@ const handleGeneratePDF = () => {
     return dateB - dateA;
   });
 
-  // Title
-  doc.setFontSize(18);
-  doc.setFont(undefined, "bold");
-  doc.text(
-    `Report (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`,
-    14,
-    20
-  );
-
-  // Generation date
-  doc.setFontSize(10);
-  doc.setFont(undefined, "normal");
-  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
-
   // Summary table
   const summary = [
     ["Total Reports", filtered.length],
@@ -206,12 +311,17 @@ const handleGeneratePDF = () => {
   ];
 
   autoTable(doc, {
-    head: [["Metric", "Count"]],
-    body: summary,
-    startY: 35,
-    theme: "striped",
-    headStyles: { fillColor: [59, 130, 246] }
-  });
+  head: [["Metric", "Count"]],
+  body: summary,
+  startY: 58, 
+  theme: "striped",
+  headStyles: { fillColor: [59, 130, 246] },
+  didDrawPage: () => {
+    addHeader(doc, start, end);
+    addFooter(doc);
+  }
+});
+
 
   // Detailed reports table
   const tableData = filtered.map((r) => [
@@ -225,13 +335,17 @@ const handleGeneratePDF = () => {
   ]);
 
   autoTable(doc, {
-    head: [["ID", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
-    body: tableData,
-    startY: doc.lastAutoTable.finalY + 10,
-    theme: "grid",
-    headStyles: { fillColor: [59, 130, 246] },
-    styles: { fontSize: 8 }
-  });
+  head: [["ID", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
+  body: tableData,
+  startY: doc.lastAutoTable.finalY + 10,
+  theme: "grid",
+  headStyles: { fillColor: [59, 130, 246] },
+  styles: { fontSize: 8 },
+  didDrawPage: () => {
+    addHeader(doc, start, end);
+    addFooter(doc);
+  },
+});
 
   // Save file
   doc.save(`Report_${startDate}_${endDate}.pdf`);
@@ -516,26 +630,25 @@ const handleGeneratePDF = () => {
         </div>
       </div>
 
-          {/*  Generate Report Modal */}
-          {showReportModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-             <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-               <h3 className="text-xl font-bold mb-4">Generate Monthly Report</h3>
+         {/* Generate Report Modal */}
+{showReportModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+      <h3 className="text-xl font-bold mb-4">Generate Monthly Report</h3>
 
-           <div className="space-y-4">
-
-             {/* Start Date */}
-            <div>
+      <div className="space-y-4">
+        {/* Start Date */}
+        <div>
           <label className="block text-sm text-gray-600 mb-1">Start Date</label>
           <input
             type="date"
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            />
-            </div>
+          />
+        </div>
 
-          {/* End Date */}
+        {/* End Date */}
         <div>
           <label className="block text-sm text-gray-600 mb-1">End Date</label>
           <input
@@ -548,25 +661,58 @@ const handleGeneratePDF = () => {
       </div>
 
       <div className="mt-6 flex justify-end gap-3">
+        {/* Cancel */}
         <button
           className="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
           onClick={() => setShowReportModal(false)}
         >
           Cancel
         </button>
-        <button
-          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
-          onClick={() => {
-            handleGeneratePDF();
-            setShowReportModal(false);
-          }}
-        >
-          Generate PDF
-        </button>
+
+        {/* Export Dropdown */}
+        <div className="relative inline-block text-left">
+          <button className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition">
+            Export As
+          </button>
+
+          {/* Dropdown menu */}
+          <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+            <button
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+              onClick={() => {
+                handleGeneratePDF();
+                setShowReportModal(false);
+              }}
+            >
+              PDF
+            </button>
+
+            <button
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+              onClick={() => {
+                handleExportCSV();
+                setShowReportModal(false);
+              }}
+            >
+              CSV
+            </button>
+
+            <button
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+              onClick={() => {
+                handleExportDOC();
+                setShowReportModal(false);
+              }}
+            >
+              DOCX
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 )}
+
 
       {/* Update Status Modal */}
       {showStatusModal && (
