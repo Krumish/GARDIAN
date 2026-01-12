@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { collectionGroup, collection, onSnapshot, doc, getDoc, updateDoc, query, where } from "firebase/firestore";
 import { db, auth, storage } from "../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
+import ReportDetailsModal from './ReportDetailsModal';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable"; 
+
 
 // Icons
 import { TbReportOff } from "react-icons/tb";
@@ -27,6 +29,7 @@ export default function Reports() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [sortBy, setSortBy] = useState("dataDesc");
+  const handleViewReport = (report) => setSelectedReport(report);
 
   // Fetch all uploads across all users in real-time
   useEffect(() => {
@@ -559,14 +562,8 @@ const handleGeneratePDF = () => {
                     </div>
                   </td>
 
-                  <td className="py-3 px-4 text-gray-700">
-                    {report.yolo?.drainage_count > 0
-                    ? "Drainage" 
-                    : report.yolo?.pothole_count > 0
-                    ? "Pothole"
-                    : report.yolo?.road_surface_count > 0
-                    ? "Road Surface"
-                    : "Unkown" }
+                  <td className="py-3 px-4 text-gray-700 font-medium">
+                     {report.issueType || "Unknown"}
                   </td>
 
                   <td className="py-3 px-4">
@@ -608,7 +605,7 @@ const handleGeneratePDF = () => {
                   <td className="py-3 px-4">
                     <button
                       className="bg-blue-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-blue-600 transition"
-                      onClick={() => setSelectedReport(report)}
+                      onClick={() => handleViewReport(report)}
                     >
                       View
                     </button>
@@ -770,203 +767,15 @@ const handleGeneratePDF = () => {
         </div>
       )}
 
-      {/* View Details Modal */}
-      {selectedReport && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 relative">
-            <button
-              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl"
-              onClick={() => setSelectedReport(null)}
-            >
-              ✕
-            </button>
-            
-            <h3 className="text-2xl font-bold mb-4">Report Details</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left Column - Info */}
-              <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
-                    <FaUser className="mr-2" /> Reporter Information
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Name:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedReport.userDetails?.firstName} {selectedReport.userDetails?.lastName}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedReport.userDetails?.phone}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Email:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedReport.userDetails?.email || "-"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Barangay:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedReport.userDetails?.barangay}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-700 mb-3">
-                    📍 Location
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Address:</span>
-                      <span className="ml-2 font-medium">
-                       {selectedReport.address || "-"}
-                     </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Latitude:</span>
-                      <span className="ml-2 font-mono text-xs">
-                        {selectedReport.latitude?.toFixed(6)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Longitude:</span>
-                      <span className="ml-2 font-mono text-xs">
-                        {selectedReport.longitude?.toFixed(6)}
-                      </span>
-                    </div>
-                    <a
-                      href={`https://www.google.com/maps?q=${selectedReport.latitude},${selectedReport.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block mt-2 bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
-                    >
-                      View on Map
-                    </a>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-700 mb-3">
-                    🔍 Detection Results
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Type:</span>
-                      <span className="ml-2 font-medium">
-                        {getInfrastructureType(selectedReport)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Drainage Status:</span>
-                      <span className={`ml-2 font-bold ${selectedReport.yolo?.status === "Clogged" ? "text-red-600" : "text-green-600"}`}>
-                        {selectedReport.yolo?.status || "-"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Drainages Detected:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedReport.yolo?.drainage_count || 0}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Obstructions Found:</span>
-                      <span className="ml-2 font-medium text-orange-600">
-                        {selectedReport.yolo?.obstruction_count || 0}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-700 mb-3">
-                    📋 Report Status
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Status:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedReport.status}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Date:</span>
-                      <span className="ml-2 text-xs">
-                        {formatDate(selectedReport.uploadedAt)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Time:</span>
-                      <span className="ml-2 text-xs">
-                        {formatTime(selectedReport.uploadedAt)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column - Images */}
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-semibold text-gray-700 mb-3">
-                    📷 Report Image
-                  </h4>
-
-              {/* Original Image */}
-              {selectedReport.url ? (
-               <div>
-                 <p p className="text-sm text-gray-600 mb-2 font-medium">Original Image</p>
-                <img
-                src={selectedReport.url}
-                 alt="Original"
-                 className="rounded-lg border border-gray-200 w-full"
-              />
-             </div>
-             ) : (
-            <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-400">
-               No original image available
-            </div>
-             )}
-             {/* Annotated Image */}
-              <div className="space-y-4">
-              {selectedReport.annotatedUrl ? (
-               <div>
-                  <p className="text-sm text-gray-600 mb-2 font-medium">Annotated Image</p>
-                  <img
-                  src={selectedReport.annotatedUrl}
-                  alt="Annotated"
-                  className="rounded-lg border border-gray-200 w-full"
-                />
-                </div>
-                ) : (
-              <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-400">
-                No annotated image available
-              </div>
-              )}
-            {/* Resolved Image */}
-              {selectedReport.resolvedImage ? (
-              <div className="mt-4">
-               <p className="text-sm text-gray-600 mb-2 font-medium">Resolved Image</p>
-              <img
-              src={selectedReport.resolvedImage}
-             alt="Resolved"
-             className="rounded-lg border border-gray-200 w-full"
-            />
-            </div>
-            ) : null} 
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+       {/* View Details Modal */}
+        {selectedReport && (
+            <ReportDetailsModal
+         selectedReport={selectedReport}
+         onClose={() => setSelectedReport(null)}
+        formatDate={(ts) => ts.toDate().toLocaleDateString()}
+         formatTime={(ts) => ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          />
+        )}
     </div>
   );
 }
