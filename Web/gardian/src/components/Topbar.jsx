@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { FaUserCircle, FaBell, FaExclamationCircle, FaCheckCircle, FaClock } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { db, auth } from "../../firebase";
-import { collectionGroup, onSnapshot, getDoc, doc } from "firebase/firestore";
+import { collectionGroup, onSnapshot, getDoc, doc, updateDoc } from "firebase/firestore";
 
 export default function Topbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -15,9 +15,10 @@ export default function Topbar() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Fetch latest reports for notifications
+  // Real-time notifications listener
   useEffect(() => {
     const uploadsQuery = collectionGroup(db, "uploads");
+    
     const unsubscribe = onSnapshot(
       uploadsQuery,
       async (snapshot) => {
@@ -34,29 +35,33 @@ export default function Topbar() {
             }
 
             const uploadData = uploadDoc.data();
+            const issueType = uploadData.issueType || "Unknown";
             const yolo = uploadData.yolo || {};
 
-            // Determine issue type and severity
-            let issueType = "Unknown";
+            // Determine severity based on issue type and YOLO data (only for Drainage)
             let severity = "low";
-            
-            if (yolo.drainage_count > 0) {
-              issueType = "Drainage";
-              // High severity if clogged or multiple obstructions
-              if (yolo.status === "Clogged" || yolo.obstruction_count > 2) {
+            let drainageStatus = null;
+            let obstructionCount = 0;
+
+            if (issueType === "Drainage" && yolo.status) {
+              drainageStatus = yolo.status; // "Clear" or "Clogged"
+              obstructionCount = yolo.obstructions?.length || 0;
+
+              // High severity if clogged or has obstructions
+              if (drainageStatus === "Clogged" || obstructionCount > 2) {
                 severity = "high";
-              } else if (yolo.obstruction_count > 0) {
+              } else if (obstructionCount > 0) {
                 severity = "medium";
               }
-            } else if (yolo.pothole_count > 0) {
-              issueType = "Pothole";
-              severity = yolo.pothole_count > 3 ? "high" : "medium";
-            } else if (yolo.road_surface_count > 0) {
-              issueType = "Road Surface";
+            } else if (issueType === "Road Surface") {
+              severity = "medium";
+            } else if (issueType === "Road Markings") {
+              severity = "medium";
+            } else if (issueType === "Waste Management") {
               severity = "medium";
             }
 
-            // Extract street from address which
+            // Extract street from address
             const fullAddress = uploadData.address || "";
             const street = fullAddress.split(",")[0] || fullAddress;
 
@@ -74,6 +79,12 @@ export default function Topbar() {
             } else if (currentStatus === "Withdrawn") {
               message = `${issueType} report at ${street} was withdrawn`;
               notifType = "withdrawn";
+            } else if (currentStatus === "Under Review") {
+              message = `${issueType} report at ${street} is under review`;
+              notifType = "review";
+            } else if (currentStatus === "In Progress") {
+              message = `${issueType} repair at ${street} is in progress`;
+              notifType = "progress";
             }
 
             return {
@@ -87,25 +98,34 @@ export default function Topbar() {
               uploadedAt: uploadData.uploadedAt,
               message,
               notifType,
-              obstructionCount: yolo.obstruction_count || 0,
-              drainageStatus: yolo.status || null,
-              read: false,
+              obstructionCount,
+              drainageStatus,
+              read: uploadData.read || false, // Get read status from Firebase
+              docRef: uploadDoc.ref, // Store document reference for updates
             };
           })
         );
 
-        // Sort by severity and date (high severity first, then newest)
+        // Sort by uploadedAt (newest first) and then by severity
         data.sort((a, b) => {
-          const severityOrder = { high: 0, medium: 1, low: 2 };
-          if (severityOrder[a.severity] !== severityOrder[b.severity]) {
-            return severityOrder[a.severity] - severityOrder[b.severity];
+          const timeA = a.uploadedAt?.seconds || 0;
+          const timeB = b.uploadedAt?.seconds || 0;
+          
+          // First sort by time (newest first)
+          if (timeB !== timeA) {
+            return timeB - timeA;
           }
-          return b.uploadedAt?.seconds - a.uploadedAt?.seconds;
+          
+          // Then by severity
+          const severityOrder = { high: 0, medium: 1, low: 2 };
+          return severityOrder[a.severity] - severityOrder[b.severity];
         });
 
         setNotifications(data);
       },
-      (err) => console.error("Error fetching notifications:", err)
+      (err) => {
+        console.error("Error fetching notifications:", err);
+      }
     );
 
     return () => unsubscribe();
@@ -124,18 +144,40 @@ export default function Topbar() {
     setIsNotifOpen(!isNotifOpen);
   };
 
-  const markAsRead = (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-    );
+  const markAsRead = async (notification) => {
+    try {
+      // Update in Firebase
+      await updateDoc(notification.docRef, {
+        read: true
+      });
+      
+      // Update local state immediately for better UX
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
+      );
+    } catch (err) {
+      console.error("Error marking notification as read:", err);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      // Update all unread notifications in Firebase
+      const updatePromises = notifications
+        .filter(n => !n.read)
+        .map(n => updateDoc(n.docRef, { read: true }));
+      
+      await Promise.all(updatePromises);
+      
+      // Update local state
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      console.error("Error marking all as read:", err);
+    }
   };
 
   const handleNotificationClick = (notification) => {
-    markAsRead(notification.id);
+    markAsRead(notification);
     setIsNotifOpen(false);
     navigate("/reports");
   };
@@ -155,7 +197,7 @@ export default function Topbar() {
       case "medium":
         return <FaExclamationCircle className="text-orange-500" />;
       default:
-        return <FaClock className="text-blue-500" />;
+        return <FaClock className="text-gray-500" />;
     }
   };
 
@@ -166,7 +208,7 @@ export default function Topbar() {
       case "medium":
         return "bg-orange-50 border-l-4 border-orange-500";
       default:
-        return "bg-blue-50 border-l-4 border-blue-500";
+        return "bg-gray-50 border-l-4 border-gray-300";
     }
   };
 
@@ -211,8 +253,9 @@ export default function Topbar() {
           >
             <FaBell
               className={`text-xl transition-colors ${
-                isNotifOpen ? "text-blue-400" : "text-gray-300 group-hover:text-white"
+                isNotifOpen ? "text-white" : "text-gray-300 group-hover:text-white"
               }`}
+              style={isNotifOpen ? {color: '#111827'} : {}}
             />
             {unreadCount > 0 && (
               <span className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full border-2 border-gray-900 animate-pulse">
@@ -224,18 +267,21 @@ export default function Topbar() {
           {isNotifOpen && (
             <div className="absolute right-0 mt-3 w-[420px] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 overflow-hidden animate-fadeIn">
               {/* Header */}
-              <div className="p-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+              <div className="p-4 border-b text-white" style={{background: 'linear-gradient(to right, #111827, #1f2937)'}}>
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-lg">Notifications</h3>
-                    <p className="text-xs text-blue-100 mt-0.5">
+                    <p className="text-xs text-gray-300 mt-0.5">
                       {unreadCount} unread • {notifications.length} total
                     </p>
                   </div>
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className="text-xs bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded-full transition-colors"
+                      className="text-xs px-3 py-1 rounded-full transition-colors text-white"
+                      style={{backgroundColor: '#374151'}}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#4b5563'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#374151'}
                     >
                       Mark all read
                     </button>
@@ -250,9 +296,10 @@ export default function Topbar() {
                       onClick={() => setFilter(f)}
                       className={`text-xs px-3 py-1 rounded-full transition-colors ${
                         filter === f
-                          ? "bg-white text-blue-600 font-medium"
-                          : "bg-blue-500/30 text-white hover:bg-blue-500/50"
+                          ? "bg-white font-medium"
+                          : "hover:bg-gray-700"
                       }`}
+                      style={filter === f ? {color: '#111827'} : {backgroundColor: 'rgba(55, 65, 81, 0.3)', color: 'white'}}
                     >
                       {f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
@@ -285,7 +332,7 @@ export default function Topbar() {
                               {n.message}
                             </p>
                             {!n.read && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{backgroundColor: '#111827'}}></div>
                             )}
                           </div>
 
@@ -299,19 +346,24 @@ export default function Topbar() {
                             <span>{getTimeAgo(n.uploadedAt)}</span>
                           </div>
 
-                          {/* Severity Badge & Info */}
+                          {/* Severity Badge & Info - Only show for Drainage with YOLO data */}
                           <div className="flex items-center gap-2 mt-2">
                             {n.severity === "high" && (
                               <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">
                                 High Priority
                               </span>
                             )}
-                            {n.drainageStatus === "Clogged" && (
+                            {n.issueType === "Drainage" && n.drainageStatus === "Clogged" && (
                               <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-medium">
                                 Clogged
                               </span>
                             )}
-                            {n.obstructionCount > 0 && (
+                            {n.issueType === "Drainage" && n.drainageStatus === "Clear" && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
+                                Clear
+                              </span>
+                            )}
+                            {n.issueType === "Drainage" && n.obstructionCount > 0 && (
                               <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">
                                 {n.obstructionCount} obstruction{n.obstructionCount > 1 ? "s" : ""}
                               </span>
@@ -334,7 +386,8 @@ export default function Topbar() {
                 <Link
                   to="/reports"
                   onClick={() => setIsNotifOpen(false)}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
+                  className="text-sm font-medium hover:underline"
+                  style={{color: '#111827'}}
                 >
                   View all reports →
                 </Link>
@@ -362,9 +415,9 @@ export default function Topbar() {
 
           {isProfileOpen && (
             <div className="absolute top-14 right-0 w-56 bg-white rounded-lg shadow-2xl text-gray-800 border border-gray-200 overflow-hidden animate-fadeIn z-50">
-              <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+              <div className="p-4 text-white" style={{background: 'linear-gradient(to right, #111827, #1f2937)'}}>
                 <p className="font-semibold">Admin User</p>
-                <p className="text-xs text-blue-100 mt-0.5">admin@gmail.com</p>
+                <p className="text-xs text-gray-300 mt-0.5">admin@gmail.com</p>
               </div>
               <ul className="py-2">
                 <li>
