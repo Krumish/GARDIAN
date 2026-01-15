@@ -48,8 +48,8 @@ class ReportHistory extends StatelessWidget {
                   final address = data['address'] ?? "";
 
                   final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
-                  final drainages = yolo['drainage_count'] ?? 0;
-                  final obstructions = yolo['obstruction_count'] ?? 0;
+                  final obstructions =
+                      (yolo['obstructions'] as List?)?.length ?? 0;
 
                   Color statusColor;
                   switch (status) {
@@ -136,7 +136,7 @@ class ReportHistory extends StatelessWidget {
                                 // DRAINAGE YOLO ONLY
                                 if (issueType == "Drainage")
                                   Text(
-                                    "Detected: $drainages drainage(s), $obstructions obstruction(s)",
+                                    "Detected: $obstructions Obstruction(s)",
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
