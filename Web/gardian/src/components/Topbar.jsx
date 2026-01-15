@@ -190,16 +190,20 @@ export default function Topbar() {
     return true;
   });
 
-  const getSeverityIcon = (severity) => {
-    switch (severity) {
-      case "high":
-        return <FaExclamationCircle className="text-red-500" />;
-      case "medium":
-        return <FaExclamationCircle className="text-orange-500" />;
-      default:
-        return <FaClock className="text-gray-500" />;
-    }
-  };
+const getSeverityIcon = (severity, status) => {
+  if (status === "Resolved") {
+    return <FaCheckCircle className="text-green-500" />;
+  }
+
+  switch (severity) {
+    case "high":
+      return <FaExclamationCircle className="text-red-500" />;
+    case "medium":
+      return <FaExclamationCircle className="text-orange-500" />;
+    default:
+      return <FaClock className="text-gray-500" />;
+  }
+};
 
   const getSeverityColor = (severity) => {
     switch (severity) {
@@ -320,7 +324,7 @@ export default function Topbar() {
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 mt-1">
-                          {getSeverityIcon(n.severity)}
+                          {getSeverityIcon(n.severity, n.status)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">
