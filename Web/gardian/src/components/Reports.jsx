@@ -3,9 +3,8 @@ import { collectionGroup, collection, onSnapshot, doc, getDoc, updateDoc, query,
 import { db, auth, storage } from "../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import ReportDetailsModal from './ReportDetailsModal';
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; 
-
+import ResolveReportModal from './ResolveReportModal';
+import { generatePDF, generateCSV, generateDOCX } from './ReportGenerate';
 
 // Icons
 import { TbReportOff } from "react-icons/tb";
@@ -21,6 +20,7 @@ export default function Reports() {
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(null);
+  const [showResolveModal, setShowResolveModal] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [showReportModal, setShowReportModal] = useState(false);
   const [resolvedImage, setResolvedImage] = useState(null)
@@ -85,10 +85,9 @@ export default function Reports() {
 
   // Determine infrastructure type based on yolo data
   const getInfrastructureType = (report) => {
-    if (report.yolo?.drainage_count > 0) return "Drainage";
-    // Add more logic here for other types when available
-    return "Invalid";
-  };
+  if (report.yolo?.drainage_count > 0) return "Drainage";
+  return report.issueType || "Unknown";
+};
 
   // Filtered reports based on search
   const filteredReports = reports
@@ -111,7 +110,7 @@ export default function Reports() {
       
     .filter((r) => {
       // Type filter
-       return typeFilter ? getInfrastructureType(r) === typeFilter : true
+       return typeFilter ? getInfrastructureType(r)?.trim() === typeFilter: true;
       })
 
     .sort((a, b) => {
@@ -127,123 +126,6 @@ export default function Reports() {
     return 0;
     });
 
-  const loadImage = (src) =>
-  new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.src = src;
-  });
-
-const addHeader = (doc, start, end) => {
-  // === LOAD IMAGES ===
-  const caintaSeal = "/cainta-seal.png";
-  const menroLogo = "/menro-logo.png";
-
-  // === LEFT SEAL ===
-  doc.addImage(
-    caintaSeal,
-    "PNG",
-    18,  // x
-    10,  // y
-    24,  // width
-    24   // height
-  );
-
-  // === RIGHT LOGO ===
-  doc.addImage(
-    menroLogo,
-    "PNG",
-    168,
-    10,
-    24,
-    24
-  );
-
-  // === CENTER HEADER TEXT ===
-  doc.setTextColor(0);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("REPUBLIC OF THE PHILIPPINES", 105, 12, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
-  doc.text("Province of Rizal", 105, 16, { align: "center" });
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("MUNICIPALITY OF CAINTA", 105, 21, { align: "center" });
-
-  doc.setFontSize(9);
-  doc.setTextColor(30, 64, 175);
-  doc.text(
-    "OFFICE OF THE MUNICIPAL ENVIRONMENT AND NATURAL RESOURCES (MENRO)",
-    105,
-    26,
-    { align: "center" }
-  );
-
-  doc.setFontSize(7);
-  doc.setTextColor(100);
-  doc.text(
-    "Cainta Municipal Hall, Bonifacio Ave, Sto. Domingo, Cainta, Rizal",
-    105,
-    30,
-    { align: "center" }
-  );
-
-  // === DIVIDER LINE ===
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.8);
-  doc.line(14, 36, 196, 36);
-
-  // === REPORT TITLE ===
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(0);
-  doc.text(
-    "INFRASTRUCTURE & ENVIRONMENTAL REPORTS SUMMARY",
-    105,
-    44,
-    { align: "center" }
-  );
-
-  // === DATE RANGE ===
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(
-    `Reporting Period: ${start.toLocaleDateString()} – ${end.toLocaleDateString()}`,
-    14,
-    50
-  );
-};
-
-const addFooter = (doc) => {
-  const pageSize = doc.internal.pageSize;
-  const pageHeight = pageSize.height || pageSize.getHeight();
-
-  // Footer line
-  doc.setLineWidth(0.5);
-  doc.line(14, pageHeight - 20, 196, pageHeight - 20);
-
-  doc.setFontSize(8);
-  doc.setTextColor(80);
-
-  // Left footer
-  doc.text(
-    "MENRO – Municipality of Cainta | Official Report",
-    14,
-    pageHeight - 12
-  );
-
-  // Right footer (page number)
-  doc.text(
-    `Page ${doc.internal.getCurrentPageInfo().pageNumber}`,
-    196,
-    pageHeight - 12,
-    { align: "right" }
-  );
-};
 
   // Helper to format date
   const formatDate = (ts) => {
@@ -266,144 +148,59 @@ const addFooter = (doc) => {
   };
 
 
- // PDF generation function
+ // Generate function
+
+ // PDF
 const handleGeneratePDF = () => {
-  // Validation
-  if (!startDate || !endDate) {
-    alert("Please select a start date and end date before generating the report.");
-    return;
-  }
+  generatePDF(reports, startDate, endDate);
+};
 
-  if (new Date(startDate) > new Date(endDate)) {
-    alert("Start date cannot be later than end date.");
-    return;
-  }
+ // CSV
+const handleExportCSV = () => {
+  generateCSV(reports, startDate, endDate);
+};
 
-  const doc = new jsPDF();
-
-  // Convert to Date objects
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  // Filter reports by date range
-  const filtered = reports.filter((r) => {
-    if (!r.uploadedAt?.toDate) return false;
-    const date = r.uploadedAt.toDate();
-    return date >= start && date <= end;
-  });
-
-  if (filtered.length === 0) {
-    alert("No reports found for the selected date range.");
-    return;
-  }
-
-  // Sort (newest first)
-  filtered.sort((a, b) => {
-    const dateA = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(0);
-    const dateB = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(0);
-    return dateB - dateA;
-  });
-
-  // Summary table
-  const summary = [
-    ["Total Reports", filtered.length],
-    ["Pending", filtered.filter((r) => r.status === "Pending").length],
-    ["Withdrawn", filtered.filter((r) => r.status === "Withdrawn").length],
-    ["Resolved", filtered.filter((r) => r.status === "Resolved").length],
-    ["Drainage Reports", filtered.filter((r) => r.yolo?.drainage_count > 0).length],
-  ];
-
-  autoTable(doc, {
-  head: [["Metric", "Count"]],
-  body: summary,
-  startY: 58, 
-  theme: "striped",
-  headStyles: { fillColor: [59, 130, 246] },
-  didDrawPage: () => {
-    addHeader(doc, start, end);
-    addFooter(doc);
-  }
-});
-
-
-  // Detailed reports table
-  const tableData = filtered.map((r) => [
-    r.id.substring(0, 8) + "...",
-    `${r.userDetails?.firstName || ""} ${r.userDetails?.lastName || ""}`.trim() || "-",
-    getInfrastructureType(r),
-    r.userDetails?.barangay || "-",
-    r.status || "Pending",
-    r.uploadedAt?.toDate().toLocaleDateString() || "-",
-    r.uploadedAt?.toDate().toLocaleTimeString() || "-",
-  ]);
-
-  autoTable(doc, {
-  head: [["ID", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
-  body: tableData,
-  startY: doc.lastAutoTable.finalY + 10,
-  theme: "grid",
-  headStyles: { fillColor: [59, 130, 246] },
-  styles: { fontSize: 8 },
-  didDrawPage: () => {
-    addHeader(doc, start, end);
-    addFooter(doc);
-  },
-});
-
-  // Save file
-  doc.save(`Report_${startDate}_${endDate}.pdf`);
+ // DOC
+const handleExportDOC = () => {
+  generateDOCX(reports, startDate, endDate);
 };
 
   // Update report status
   const handleUpdateStatus = async () => {
-  if (!showStatusModal || !newStatus) return;
+    if (!showStatusModal || !newStatus) return;
 
-  try {
-    // If marking as Resolved, require image upload
-    let resolvedImageUrl = null;
-
+    // If trying to resolve, open the systematic modal instead
     if (newStatus === "Resolved") {
-      if (!resolvedImage) {
-        alert("Please upload a resolved image before marking as resolved.");
-        return;
-      }
-
-      // Upload image to Firebase Storage
-      const storageRef = ref(
-        storage,
-        `resolved_images/${showStatusModal.id}_${Date.now()}.jpg`
-      );
-      await uploadBytes(storageRef, resolvedImage);
-      resolvedImageUrl = await getDownloadURL(storageRef);
+      setShowResolveModal(showStatusModal);
+      setShowStatusModal(null);
+      setNewStatus("");
+      return;
     }
 
-    // Get a valid doc reference (sometimes modal stores plain data)
-    const reportDoc =
-      showStatusModal.docRef?.id
+    // For Pending and Withdrawn, update directly
+    try {
+      const reportDoc = showStatusModal.docRef?.id
         ? showStatusModal.docRef
         : doc(db, "users", showStatusModal.userId, "uploads", showStatusModal.id);
 
-    // Update Firestore
-    const updateData = {
-      status: newStatus,
-    };
+      await updateDoc(reportDoc, {
+        status: newStatus,
+      });
 
-    if (resolvedImageUrl) {
-      updateData.resolvedImage = resolvedImageUrl;
-      updateData.resolvedAt = new Date();
+      alert("✅ Report status updated successfully!");
+      setShowStatusModal(null);
+      setNewStatus("");
+    } catch (err) {
+      console.error("Error updating status:", err);
+      alert("Failed to update status. Check console for details.");
     }
+  };
 
-    await updateDoc(reportDoc, updateData);
-
-    alert("✅ Report status updated successfully!");
-    setShowStatusModal(null);
-    setNewStatus("");
-    setResolvedImage(null);
-  } catch (err) {
-    console.error("Error updating status:", err);
-    alert("Failed to update status. Check console for details.");
-  }
-};
+    // Handle successful resolution
+  const handleResolutionSuccess = () => {
+    setShowResolveModal(null);
+    console.log("✅ Report resolved successfully!");
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -475,16 +272,17 @@ const handleGeneratePDF = () => {
           <option value="Withdrawn">Withdrawn</option>
         </select>
 
-       {/* Type Filter */}
-        <select
-           value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-           className="border border-gray-300 rounded-lg px-3 py-2"
-        >
-           <option value="">All Types</option>
-          <option value="Drainage">Drainage</option>
-          <option value="Pothole">Pothole</option>
-          <option value="Road Surface">Road Surface</option>
+        {/* Type Filter */}
+          <select
+            value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Types</option>
+            <option value="Drainage">Drainage</option>
+            <option value="Road Markings">Road Markings</option>
+            <option value="Road Surface">Road Surface</option>
+            <option value="Waste Management">Waste Management</option>
         </select>
 
         {/* Sort */}
@@ -730,22 +528,17 @@ const handleGeneratePDF = () => {
               <option value="">Select new status</option>
               <option value="Pending">Pending</option>
               <option value="Withdrawn">Withdrawn</option>
-              <option value="Resolved">Resolved</option>
+              <option value="Resolved">Resolved (Opens Resolution Form)</option>
             </select>
             
             {newStatus === "Resolved" && (
-  <div className="mb-4">
-    <label className="block text-sm text-gray-600 mb-2">
-      Upload updated image (required)
-    </label>
-    <input
-      type="file"
-      accept="image/*"
-      onChange={(e) => setResolvedImage(e.target.files[0])}
-      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-    />
-  </div>
-)}
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  ℹ️ Clicking "Update" will open a systematic resolution form
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
@@ -767,15 +560,24 @@ const handleGeneratePDF = () => {
         </div>
       )}
 
-       {/* View Details Modal */}
-        {selectedReport && (
-            <ReportDetailsModal
-         selectedReport={selectedReport}
-         onClose={() => setSelectedReport(null)}
-        formatDate={(ts) => ts.toDate().toLocaleDateString()}
-         formatTime={(ts) => ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          />
-        )}
+      {/* NEW: Systematic Resolve Report Modal */}
+      {showResolveModal && (
+        <ResolveReportModal
+          report={showResolveModal}
+          onClose={() => setShowResolveModal(null)}
+          onSuccess={handleResolutionSuccess}
+        />
+      )}
+
+      {/* View Details Modal */}
+      {selectedReport && (
+        <ReportDetailsModal
+          selectedReport={selectedReport}
+          onClose={() => setSelectedReport(null)}
+          formatDate={(ts) => ts.toDate().toLocaleDateString()}
+          formatTime={(ts) => ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        />
+      )}
     </div>
   );
 }
