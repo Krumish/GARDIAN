@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../services/auth_services.dart';
 import 'report/issue_type_selection_page.dart';
 import '../../widgets/custom_drawer.dart';
 import '../../widgets/report_history.dart';
 import '../../widgets/home_header.dart';
+import '../../widgets/notification_modal.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -27,8 +30,10 @@ class _HomePageState extends State<HomePage> {
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            onPressed: () {},
             icon: const Icon(Icons.notifications_none, color: Colors.white),
+            onPressed: () {
+              showNotificationModal(context);
+            },
           ),
         ],
       ),
@@ -36,9 +41,28 @@ class _HomePageState extends State<HomePage> {
       drawer: const CustomDrawer(),
 
       body: Column(
-        children: const [
-          HomeHeader(),
-          Expanded(child: ReportHistory()),
+        children: [
+          const HomeHeader(),
+          ElevatedButton(
+            onPressed: () async {
+              final uid = authService.value.currentUser!.uid;
+
+              await FirebaseFirestore.instance
+                  .collection("users")
+                  .doc(uid)
+                  .collection("notifications")
+                  .add({
+                    "reportId": "TEST_UI",
+                    "oldStatus": "Pending",
+                    "newStatus": "Resolved",
+                    "message": "Your report has been resolved",
+                    "createdAt": FieldValue.serverTimestamp(),
+                    "read": false,
+                  });
+            },
+            child: const Text("TEST NOTIFICATION"),
+          ),
+          const Expanded(child: ReportHistory()),
         ],
       ),
 
