@@ -16,120 +16,123 @@ export default function Topbar() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Real-time notifications listener
-  useEffect(() => {
-    const uploadsQuery = collectionGroup(db, "uploads");
-    
-    const unsubscribe = onSnapshot(
-      uploadsQuery,
-      async (snapshot) => {
-        const data = await Promise.all(
-          snapshot.docs.map(async (uploadDoc) => {
-            const userId = uploadDoc.ref.parent.parent?.id || "unknown";
-            let userDetails = null;
+useEffect(() => {
+  const uploadsQuery = collectionGroup(db, "uploads");
 
-            try {
-              const userDoc = await getDoc(doc(db, "users", userId));
-              if (userDoc.exists()) userDetails = userDoc.data();
-            } catch (err) {
-              console.error("Error fetching user details:", err);
-            }
+  const unsubscribe = onSnapshot(
+    uploadsQuery,
+    async (snapshot) => {
+      // fetch user details only for UNREAD reports
+      const rawData = await Promise.all(
+        snapshot.docs.map(async (uploadDoc) => {
+          const uploadData = uploadDoc.data();
 
-            const uploadData = uploadDoc.data();
-            const issueType = uploadData.issueType || "Unknown";
-            const yolo = uploadData.yolo || {};
+          // CRITICAL: Skip reports already marked as read
+          if (uploadData.read === true) return null;
 
-            // Determine severity based on issue type and YOLO data (only for Drainage)
-            let severity = "low";
-            let drainageStatus = null;
-            let obstructionCount = 0;
+          const userId = uploadDoc.ref.parent.parent?.id || "unknown";
+          let userDetails = null;
 
-            if (issueType === "Drainage" && yolo.status) {
-              drainageStatus = yolo.status; // "Clear" or "Clogged"
-              obstructionCount = yolo.obstructions?.length || 0;
-
-              // High severity if clogged or has obstructions
-              if (drainageStatus === "Clogged" || obstructionCount > 2) {
-                severity = "high";
-              } else if (obstructionCount > 0) {
-                severity = "medium";
-              }
-            } else if (issueType === "Road Surface") {
-              severity = "medium";
-            } else if (issueType === "Road Markings") {
-              severity = "medium";
-            } else if (issueType === "Waste Management") {
-              severity = "medium";
-            }
-
-            // Extract street from address
-            const fullAddress = uploadData.address || "";
-            const street = fullAddress.split(",")[0] || fullAddress;
-
-            // Determine notification message based on status
-            let message = "";
-            let notifType = "new";
-            const currentStatus = uploadData.status || "Pending";
-
-            if (currentStatus === "Pending") {
-              message = `New ${issueType} report at ${street}`;
-              notifType = "new";
-            } else if (currentStatus === "Resolved") {
-              message = `${issueType} issue at ${street} has been resolved`;
-              notifType = "resolved";
-            } else if (currentStatus === "Withdrawn") {
-              message = `${issueType} report at ${street} was withdrawn`;
-              notifType = "withdrawn";
-            } else if (currentStatus === "Under Review") {
-              message = `${issueType} report at ${street} is under review`;
-              notifType = "review";
-            } else if (currentStatus === "In Progress") {
-              message = `${issueType} repair at ${street} is in progress`;
-              notifType = "progress";
-            }
-
-            return {
-              id: uploadDoc.id,
-              userId,
-              userDetails,
-              issueType,
-              street,
-              status: currentStatus,
-              severity,
-              uploadedAt: uploadData.uploadedAt,
-              message,
-              notifType,
-              obstructionCount,
-              drainageStatus,
-              read: uploadData.read || false, // Get read status from Firebase
-              docRef: uploadDoc.ref, // Store document reference for updates
-            };
-          })
-        );
-
-        // Sort by uploadedAt (newest first) and then by severity
-        data.sort((a, b) => {
-          const timeA = a.uploadedAt?.seconds || 0;
-          const timeB = b.uploadedAt?.seconds || 0;
-          
-          // First sort by time (newest first)
-          if (timeB !== timeA) {
-            return timeB - timeA;
+          try {
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (userDoc.exists()) userDetails = userDoc.data();
+          } catch (err) {
+            console.error("Error fetching user details:", err);
           }
-          
-          // Then by severity
-          const severityOrder = { high: 0, medium: 1, low: 2 };
-          return severityOrder[a.severity] - severityOrder[b.severity];
-        });
 
-        setNotifications(data);
-      },
-      (err) => {
-        console.error("Error fetching notifications:", err);
-      }
-    );
+          const issueType = uploadData.issueType || "Unknown";
+          const yolo = uploadData.yolo || {};
 
-    return () => unsubscribe();
-  }, []);
+          // Determine severity based on issue type and YOLO data
+          let severity = "low";
+          let drainageStatus = null;
+          let obstructionCount = 0;
+
+          if (issueType === "Drainage" && yolo.status) {
+            drainageStatus = yolo.status; // "Clear" or "Clogged"
+            obstructionCount = yolo.obstructions?.length || 0;
+
+            if (drainageStatus === "Clogged" || obstructionCount > 2) {
+              severity = "high";
+            } else if (obstructionCount > 0) {
+              severity = "medium";
+            }
+          } else {
+            // Default medium for other types
+            severity = "medium";
+          }
+
+          // Extract street from address
+          const fullAddress = uploadData.address || "";
+          const street = fullAddress.split(",")[0] || fullAddress;
+
+          // Determine notification message based on status
+          let message = "";
+          let notifType = "new";
+          const currentStatus = uploadData.status || "Pending";
+
+          if (currentStatus === "Pending") {
+            message = `New ${issueType} report at ${street}`;
+            notifType = "new";
+          } else if (currentStatus === "Resolved") {
+            message = `${issueType} issue at ${street} has been resolved`;
+            notifType = "resolved";
+          } else if (currentStatus === "Withdrawn") {
+            message = `${issueType} report at ${street} was withdrawn`;
+            notifType = "withdrawn";
+          } else if (currentStatus === "Under Review") {
+            message = `${issueType} report at ${street} is under review`;
+            notifType = "review";
+          } else if (currentStatus === "In Progress") {
+            message = `${issueType} repair at ${street} is in progress`;
+            notifType = "progress";
+          }
+
+          return {
+            id: uploadDoc.id,
+            userId,
+            userDetails,
+            issueType,
+            street,
+            status: currentStatus,
+            severity,
+            uploadedAt: uploadData.uploadedAt,
+            message,
+            notifType,
+            obstructionCount,
+            drainageStatus,
+            read: false, 
+            docRef: uploadDoc.ref,
+          };
+        })
+      );
+
+      // Filter out null entries (the reports that were already read)
+      const cleanData = rawData.filter((n) => n !== null);
+
+      // Sort by uploadedAt (newest first) and then by severity
+      cleanData.sort((a, b) => {
+        const timeA = a.uploadedAt?.seconds || 0;
+        const timeB = b.uploadedAt?.seconds || 0;
+
+        if (timeB !== timeA) {
+          return timeB - timeA;
+        }
+
+        const severityOrder = { high: 0, medium: 1, low: 2 };
+        return severityOrder[a.severity] - severityOrder[b.severity];
+      });
+
+      // Update state
+      setNotifications(cleanData);
+    },
+    (err) => {
+      console.error("Error fetching notifications:", err);
+    }
+  );
+
+  return () => unsubscribe();
+}, []);
 
   const handleLogout = async () => {
     try {
@@ -176,12 +179,17 @@ export default function Topbar() {
     }
   };
 
-  const handleNotificationClick = (notification) => {
-    markAsRead(notification);
-    setIsNotifOpen(false);
-    navigate("/reports");
-  };
+  const handleNotificationClick = async (notification) => {
+    try {
+      await updateDoc(notification.docRef, { read: true });
 
+      setIsNotifOpen(false);
+      navigate("/reports");
+    
+      } catch (err) {
+          console.error("Error handling notification click:", err);
+     }
+    };
   // Filter notifications
   const filteredNotifications = notifications.filter((n) => {
     if (filter === "unread") return !n.read;

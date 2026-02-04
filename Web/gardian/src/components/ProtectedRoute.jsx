@@ -4,7 +4,7 @@ import { Navigate } from "react-router-dom";
 export default function ProtectedRoute({ component: Component, allowedRoles }) {
   const { user, role, loading } = useUser();
 
-  console.log("🛡️ ProtectedRoute check:", {
+  console.log("ProtectedRoute check:", {
     loading,
     hasUser: !!user,
     userRole: role,
@@ -14,7 +14,7 @@ export default function ProtectedRoute({ component: Component, allowedRoles }) {
 
   // While auth state is loading
   if (loading) {
-    console.log("⏳ Still loading auth state...");
+    console.log("Still loading auth state...");
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 
