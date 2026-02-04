@@ -29,6 +29,26 @@ class NotificationService {
         .doc(notificationId)
         .update({"read": true});
   }
+
+  Future<void> clearAllNotifications() async {
+    final uid = authService.value.currentUser?.uid;
+    if (uid == null) return;
+
+    final batch = _firestore.batch();
+
+    final snapshot = await _firestore
+        .collection("users")
+        .doc(uid)
+        .collection("notifications")
+        .get();
+
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
+  }
+
 }
 
 final notificationService = NotificationService();

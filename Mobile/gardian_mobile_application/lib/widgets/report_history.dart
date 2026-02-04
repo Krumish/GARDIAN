@@ -53,11 +53,8 @@ class ReportHistory extends StatelessWidget {
 
                   Color statusColor;
                   switch (status) {
-                    case "In Progress":
+                    case "Pending":
                       statusColor = Colors.redAccent;
-                      break;
-                    case "Assigned":
-                      statusColor = Colors.orangeAccent;
                       break;
                     case "Resolved":
                       statusColor = Colors.green;
