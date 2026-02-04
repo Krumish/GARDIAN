@@ -20,24 +20,24 @@ class _OnboardingPageState extends State<OnboardingPage> {
     _Page(
       title: "Detect & Report",
       text: "GARDIAN helps detect, assess, and report community issues easily.",
-      image: "assets/icons/GARDIAN_LOGO.png",
+      image: "assets/icons/1.png",
     ),
     _Page(
       title: "Smart Analysis",
       text:
           "Upload a photo — drainage, roads, or waste are analyzed instantly.",
-      image: "assets/icons/GARDIAN_LOGO.png",
+      image: "assets/icons/2.png",
     ),
     _Page(
       title: "Insights",
       text: "Get summaries, issue details, and mapped locations.",
-      image: "assets/icons/GARDIAN_LOGO.png",
+      image: "assets/icons/3.png",
     ),
     _Page(
       title: "Help Communities",
       text:
           "Submit reports and help create safer and more sustainable communities.",
-      image: "assets/icons/GARDIAN_LOGO.png",
+      image: "assets/icons/4.png",
     ),
   ];
 
@@ -81,7 +81,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   height: 10,
                   width: current == i ? 24 : 10,
                   decoration: BoxDecoration(
-                    color: current == i ? Colors.black : Colors.grey[300],
+                    color: current == i ? Color(0xFF122D5A) : Colors.grey[300],
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
