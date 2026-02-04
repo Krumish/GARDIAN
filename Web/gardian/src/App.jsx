@@ -1,7 +1,7 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { db } from "../firebase";
-import { collectionGroup, onSnapshot, query, orderBy, limit, getDoc, doc } from "firebase/firestore";
+import { collectionGroup, onSnapshot, getDoc, doc } from "firebase/firestore";
 import { useUser } from "./context/UserContext.jsx";
 
 // Components
@@ -17,7 +17,7 @@ import UserManagement from "./components/UserManagement";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 // Icons
-import { FaHistory, FaUsers, FaCheckCircle } from "react-icons/fa";
+import { FaHistory, FaUsers, FaCheckCircle, FaMapMarkerAlt, FaUser } from "react-icons/fa"; // Added FaUser, FaMapMarkerAlt
 import { TbReportOff } from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
 import { MdPending } from "react-icons/md";
@@ -31,7 +31,17 @@ export default function App() {
   const isAuthPage =
     location.pathname === "/login" || location.pathname === "/signup";
 
-  // Fetch all reports for summary cards
+  // --- Helper: Generate REF number ---
+  const generateRefCode = (report) => {
+    if (!report || !report.id) return "REF-00000000-XXXXX";
+    const ts = report.uploadedAt;
+    const dateObj = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+    const dateStr = dateObj && !isNaN(dateObj) ? dateObj.toISOString().slice(0, 10).replace(/-/g, "") : "00000000";
+    const shortHash = report.id.slice(-5).toUpperCase();
+    return `REF-${dateStr}-${shortHash}`;
+  };
+
+  // Fetch ALL reports
   useEffect(() => {
     if (!user || !role) return;
 
@@ -39,10 +49,14 @@ export default function App() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const data = snapshot.docs.map((doc) => {
+          const userId = doc.ref.parent.parent?.id || "unknown";
+          return {
+            id: doc.id,
+            userId: userId,
+            ...doc.data(),
+          };
+        });
         setReports(data);
       },
       (err) => console.error("Error fetching reports:", err)
@@ -51,43 +65,52 @@ export default function App() {
     return () => unsubscribe();
   }, [user, role]);
 
-  // Fetch 5 most recent reports for table
+  // Process 5 Recent Reports 
   useEffect(() => {
-    if (!user || !role) return;
+    if (reports.length === 0) {
+      setRecentReports([]);
+      return;
+    }
 
-    const recentQuery = query(
-      collectionGroup(db, "uploads"),
-      orderBy("uploadedAt", "desc"),
-      limit(5)
-    );
+    const processRecent = async () => {
+      // Sort by date (Newest first)
+      const sorted = [...reports].sort((a, b) => {
+        const dateA = a.uploadedAt?.seconds || 0;
+        const dateB = b.uploadedAt?.seconds || 0;
+        return dateB - dateA;
+      });
 
-    const unsubscribe = onSnapshot(recentQuery, async (snapshot) => {
-      const recent = await Promise.all(
-        snapshot.docs.map(async (uploadDoc) => {
-          const userId = uploadDoc.ref.parent.parent?.id || "unknown";
+      // Get recent 5
+      const top5 = sorted.slice(0, 5);
 
-          // fetch user details
+      // Fetch User Details
+      const detailed = await Promise.all(
+        top5.map(async (report) => {
           let userDetails = null;
-          try {
-            const userDoc = await getDoc(doc(db, "users", userId));
-            if (userDoc.exists()) userDetails = userDoc.data();
-          } catch (err) {
-            console.error("Error fetching user details:", err);
+          if (report.userId && report.userId !== "unknown") {
+            try {
+              const userDoc = await getDoc(doc(db, "users", report.userId));
+              if (userDoc.exists()) {
+                userDetails = userDoc.data();
+              }
+            } catch (err) {
+              console.error("Error fetching user:", err);
+            }
           }
 
           return {
-            id: uploadDoc.id,
-            userId,
+            ...report,
             userDetails,
-            ...uploadDoc.data(),
+            refCode: generateRefCode(report),
           };
         })
       );
-      setRecentReports(recent);
-    });
 
-    return () => unsubscribe();
-  }, [user, role]);
+      setRecentReports(detailed);
+    };
+
+    processRecent();
+  }, [reports]);
 
   if (loading) {
     return (
@@ -99,21 +122,17 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
       {!isAuthPage && user && <Sidebar />}
 
       <div className="flex-1 flex flex-col">
-        {/* Topbar */}
         {!isAuthPage && user && (
           <div className="sticky top-0 z-50">
             <Topbar />
           </div>
         )}
 
-        {/* Main scrollable content */}
         <main className="flex-1 p-6 overflow-y-auto">
           <Routes>
-            {/* Dashboard */}
             <Route
               path="/"
               element={
@@ -123,12 +142,8 @@ export default function App() {
                 />
               }
             />
-
-            {/* Auth Pages */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-
-            {/* Other Pages */}
             <Route
               path="/analytics"
               element={
@@ -162,8 +177,6 @@ export default function App() {
                 />
               }
             />
-
-            {/* Fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </main>
@@ -182,18 +195,19 @@ function Dashboard({ reports, recentReports }) {
   const formatDate = (ts) => {
     if (!ts) return "-";
     if (ts.toDate) return ts.toDate().toLocaleDateString();
-    return ts;
+    return new Date(ts).toLocaleDateString();
   };
 
   const formatTime = (ts) => {
     if (!ts) return "-";
     if (ts.toDate) return ts.toDate().toLocaleTimeString();
-    return ts;
+    return new Date(ts).toLocaleTimeString();
   };
 
+  // Helper
   const getInfrastructureType = (report) => {
     if (report.yolo?.drainage_count > 0) return "Drainage";
-    return "Unknown";
+    return report.issueType || "Unknown";
   };
 
   return (
@@ -233,46 +247,102 @@ function Dashboard({ reports, recentReports }) {
         <MonthlyReportChart reports={reports} />
       </div>
 
-      {/* Recent Reports Table */}
-      <div className="p-6 bg-white rounded-xl shadow">
-        <h2 className="text-xl font-semibold mb-4">Recent Reports</h2>
+      {/* Recent Reports Table - EXACT FORMAT MATCHING REPORTS.JSX */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
+        <h2 className="text-lg font-semibold mb-4">Recent Reports</h2>
+        
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full">
             <thead>
               <tr className="bg-gray-100 sticky top-0 z-10 bg-white shadow">
-                <th className="px-4 py-2 font-bold">Report ID</th>
-                <th className="px-4 py-2 font-bold">Name</th>
-                <th className="px-4 py-2 font-bold">Type</th>
-                <th className="px-4 py-2 font-bold">Location</th>
-                <th className="px-4 py-2 font-bold">Date</th>
-                <th className="px-4 py-2 font-bold">Time</th>
-                <th className="px-4 py-2 font-bold">Status</th>
+                <th className="px-4 py-2 font-bold text-left">Reference Number</th>
+                <th className="px-4 py-2 font-bold text-left">Name</th>
+                <th className="px-4 py-2 font-bold text-left">Type</th>
+                <th className="px-4 py-2 font-bold text-left">Address</th>
+                <th className="px-4 py-2 font-bold text-left">Date</th>
+                <th className="px-4 py-2 font-bold text-left">Time</th>
+                <th className="px-4 py-2 font-bold text-left">Status</th>
               </tr>
             </thead>
             <tbody>
               {recentReports.length > 0 ? (
                 recentReports.map((report) => (
-                  <tr key={report.id} className="border-b hover:bg-gray-100 even:bg-gray-50">
+                  <tr key={report.id} className="border-b hover:bg-gray-50 text-sm">
+                    {/* Reference Number Column */}
                     <td className="py-3 px-4">
-                      <span className="font-mono text-xs text-gray-700">
-                        {report.id.substring(0, 8)}...
-                      </span>
+                      <div
+                        className="inline-flex items-center bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden"
+                        title="Click REF to copy"
+                      >
+                        <span className="px-2 py-1 bg-gray-100 text-[10px] font-bold text-gray-500 border-r border-gray-300">
+                          REF
+                        </span>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(report.refCode)}
+                          className="px-2 py-1 font-mono text-xs text-gray-800 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100 transition-colors"
+                        >
+                          {report.refCode}
+                        </button>
+                      </div>
                     </td>
+
+                    {/* Name Column */}
                     <td className="py-3 px-4">
-                      {report.userDetails?.firstName} {report.userDetails?.lastName}
+                      <div className="flex items-center">
+                        <FaUser className="text-gray-400 mr-2 text-xs" />
+                        <div>
+                          <div className="font-medium">
+                            {report.userDetails?.firstName} {report.userDetails?.lastName}
+                          </div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="text-gray-700 text-xs font-medium">
-                        {getInfrastructureType(report)}
-                      </span>
+
+                    {/* Type Column */}
+                    <td className="py-3 px-4 text-gray-700 font-medium">
+                      {getInfrastructureType(report)}
                     </td>
-                    <td className="py-3 px-4">{report.userDetails?.barangay || "-"}</td>
-                    <td className="py-3 px-4 text-xs">{formatDate(report.uploadedAt)}</td>
-                    <td className="py-3 px-4 text-xs">{formatTime(report.uploadedAt)}</td>
+
+                    {/* Address Column */}
                     <td className="py-3 px-4">
-                      {report.status === "Pending" && <StatusBadge type="pending" />}
-                      {report.status === "Withdrawn" && <StatusBadge type="withdrawn" />}
-                      {report.status === "Resolved" && <StatusBadge type="resolved" />}
+                      <div className="flex items-center">
+                        <FaMapMarkerAlt className="text-gray-400 mr-1 text-xs" />
+                        <span className="text-gray-700 text-xs font-medium">
+                          {report.address || "-"}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Date Column */}
+                    <td className="py-3 px-4 text-xs">
+                      {formatDate(report.uploadedAt)}
+                    </td>
+
+                    {/* Time Column */}
+                    <td className="py-3 px-4 text-xs">
+                      {formatTime(report.uploadedAt)}
+                    </td>
+
+                    {/* Status Column */}
+                    <td className="py-3 px-4">
+                      {/* Using div instead of button since dashboard is view-only, but keeping style */}
+                      <div className="flex items-center">
+                        {report.status === "Pending" && (
+                          <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                            <RiHourglassFill className="mr-1" /> Pending
+                          </span>
+                        )}
+                        {report.status === "Withdrawn" && (
+                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                            <MdPending className="mr-1" /> Withdrawn
+                          </span>
+                        )}
+                        {report.status === "Resolved" && (
+                          <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                            <FaCheckCircle className="mr-1" /> Resolved
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -299,34 +369,7 @@ function StatCard({ title, value, icon, color }) {
         <h3 className="text-sm font-medium text-gray-500">{title}</h3>
         {icon}
       </div>
-
-
       <p className={`text-3xl font-bold ${color}`}>{value}</p>
     </div>
   );
-}
-
-function StatusBadge({ type }) {
-  switch (type) {
-    case "pending":
-      return (
-        <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs font-medium flex items-center w-fit">
-          <RiHourglassFill className="mr-1" /> Pending
-        </span>
-      );
-    case "withdrawn":
-      return (
-        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium flex items-center w-fit">
-          <MdPending className="mr-1" /> Withdrawn
-        </span>
-      );
-    case "resolved":
-      return (
-        <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs font-medium flex items-center w-fit">
-          <FaCheckCircle className="mr-1" /> Resolved
-        </span>
-      );
-    default:
-      return null;
-  }
 }
