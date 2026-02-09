@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import '../screens/home/about_page.dart';
 import '../services/auth_services.dart';
+import '../screens/home/home_page.dart';
+import '../screens/feedback_page.dart';
+import '../screens/contact_page.dart';
 
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key});
@@ -15,9 +19,7 @@ class CustomDrawer extends StatelessWidget {
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(color: Color(0xFF122D5A)),
               currentAccountPicture: const CircleAvatar(
-                backgroundImage: AssetImage(
-                  "assets/icons/user_avatar.png",
-                ), // placeholder
+                backgroundImage: AssetImage("assets/icons/user_avatar.png"),
               ),
               accountName: const Text(
                 "User",
@@ -28,12 +30,25 @@ class CustomDrawer extends StatelessWidget {
                 style: TextStyle(color: Colors.greenAccent),
               ),
             ),
+
             _drawerItem(Icons.home, "Home", () {
-              Navigator.pop(context);
+              _navigate(context, const HomePage());
             }),
-            _drawerItem(Icons.feedback, "Send Feedback", () {}),
-            _drawerItem(Icons.call, "Contact Us", () {}),
-            _drawerItem(Icons.info_outline, "About", () {}),
+
+            _drawerItem(Icons.feedback, "Send Feedback", () {
+              _navigate(context, const FeedbackPage());
+            }),
+
+            _drawerItem(Icons.call, "Contact Us", () {
+              _navigate(context, const ContactPage());
+            }),
+
+            _drawerItem(Icons.info_outline, "About", () {
+              _navigate(context, const AboutPage());
+            }),
+
+            const Divider(color: Colors.white54),
+
             _drawerItem(Icons.logout, "Log Out", () async {
               await authService.value.signOut();
             }),
@@ -41,6 +56,11 @@ class CustomDrawer extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _navigate(BuildContext context, Widget page) {
+    Navigator.pop(context); // close drawer
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
   Widget _drawerItem(IconData icon, String text, VoidCallback onTap) {
