@@ -17,7 +17,7 @@ export default function ReportChart() {
     datasets: [
       {
         label: "Number of Reports",
-        data: [83, 157, 458, 255, 322], // 🔥 sample values, you can adjust
+        data: [83, 157, 458, 255, 322], // sample values, you can adjust
         backgroundColor: [
           "rgba(33, 47, 80, 0.9)", // San Roque
           "rgba(33, 47, 80, 0.9)", // San Juan

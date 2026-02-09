@@ -30,6 +30,12 @@ export default function Reports() {
   const [typeFilter, setTypeFilter] = useState("");
   const [sortBy, setSortBy] = useState("dataDesc");
   const handleViewReport = (report) => setSelectedReport(report);
+  const generateRefCode = (report) => { if (!report || !report.id) return "REF-00000000-XXXXX";
+  const ts = report.uploadedAt;
+  const dateObj = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+  const dateStr = dateObj && !isNaN(dateObj) ? dateObj.toISOString().slice(0, 10).replace(/-/g, "") : "00000000";
+  const shortHash = report.id.slice(-5).toUpperCase();return `REF-${dateStr}-${shortHash}`;};
+
 
   // Fetch all uploads across all users in real-time
   useEffect(() => {
@@ -325,7 +331,7 @@ const handleExportDOC = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-100 sticky top-0 z-10 bg-white shadow">
-                <th className="px-4 py-2 font-bold">Report ID</th>
+                <th className="px-4 py-2 font-bold">Reference Number</th>
                 <th className="px-4 py-2 font-bold">Name</th>
                 <th className="px-4 py-2 font-bold">Type</th>
                 <th className="px-4 py-2 font-bold">Address</th>
@@ -339,15 +345,21 @@ const handleExportDOC = () => {
               {filteredReports.map((report) => (
                 <tr
                   key={report.id}
-                  className="border-b hover:bg-gray-50 text-sm"
-                >
+                  className="border-b hover:bg-gray-50 text-sm">
                   <td className="py-3 px-4">
-                    <button
-                      className="font-mono text-xs text-gray-700 hover:text-blue-600 underline"
-                      onClick={() => alert(`Full Report ID:\n${report.id}`)}
-                    >
-                      {report.id.substring(0, 8)}...
-                    </button>
+                    <div
+                      className="inline-flex items-center bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden"
+                      title="Click REF to copy">
+                      <span className="px-2 py-1 bg-gray-100 text-[10px] font-bold text-gray-500 border-r border-gray-300">
+                        REF
+                      </span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(generateRefCode(report))}
+                        className="px-2 py-1 font-mono text-xs text-gray-800 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100 transition-colors"
+                      >
+                        {generateRefCode(report)}
+                      </button>
+                    </div>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center">
