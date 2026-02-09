@@ -60,12 +60,25 @@ class StorageService {
           "url": url,
           "annotatedUrl": annotatedUrl,
           "uploadedAt": FieldValue.serverTimestamp(),
+
+          // 🔍 Full YOLO payload (for audit & review)
           "yolo": cleanYolo,
+
+          // 🔢 PROMOTED YOLO METRICS (IMPORTANT)
+          "blockagePercent": cleanYolo["blockage_percent"],
+          "blockageRatio": cleanYolo["max_blockage_ratio"],
+          "drainageCount": cleanYolo["drainage_count"],
+          "obstructionCount": cleanYolo["obstruction_count"],
+          "yoloStatus": cleanYolo["status"],
+
+          // 📍 Metadata
           "latitude": lat,
           "longitude": lng,
           "address": address,
           "note": note,
           "issueType": issueType ?? "Unknown",
+
+          // 🚦 Workflow status
           "status": "Pending",
         });
   }

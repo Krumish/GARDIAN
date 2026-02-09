@@ -59,8 +59,18 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
       final yoloSummary = {
         "status": results["status"],
+
+        // 🔢 summary metrics
+        "blockage_percent": results["blockage_percent"],
+        "max_blockage_ratio": results["max_blockage_ratio"],
+        "drainage_count": results["drainage_count"],
+        "obstruction_count": results["obstruction_count"],
+
+        // 🧾 objects
         "drainage": drainageList,
         "obstructions": obstructionList,
+
+        // 🖼 image
         "annotated_image": results["annotated_image"],
       };
 

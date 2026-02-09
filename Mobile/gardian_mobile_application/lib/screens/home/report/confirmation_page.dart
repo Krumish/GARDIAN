@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
+
 import '../../../services/storage_service.dart';
 
 class ConfirmationPage extends StatefulWidget {
@@ -38,6 +40,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     super.initState();
     _yoloResults = widget.yoloResults;
 
+    // Decode annotated image (if present)
     if (_yoloResults?["annotated_image"] != null) {
       try {
         _annotatedImageBytes = base64Decode(
@@ -50,6 +53,22 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
     _fetchAddressFromCoordinates();
   }
+
+  // ===================== HELPERS =====================
+
+  String _blockageLabel(double percent) {
+    if (percent < 30) return "Low blockage";
+    if (percent < 60) return "Moderate blockage";
+    return "Severe blockage";
+  }
+
+  Color _blockageColor(double percent) {
+    if (percent < 30) return Colors.green;
+    if (percent < 60) return Colors.orange;
+    return Colors.red;
+  }
+
+  // ===================== LOCATION =====================
 
   Future<void> _fetchAddressFromCoordinates() async {
     setState(() => _isFetchingAddress = true);
@@ -78,6 +97,8 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     }
   }
 
+  // ===================== UPLOAD =====================
+
   Future<void> _uploadToFirebase(BuildContext context) async {
     if (_locationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,19 +115,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         const SnackBar(content: Text("☁️ Uploading to Firebase...")),
       );
 
-      File uploadFile = widget.imageFile;
-
-      if (_annotatedImageBytes != null) {
-        final tempPath = "${Directory.systemTemp.path}/annotated_upload.jpg";
-        final tempFile = File(tempPath);
-        await tempFile.writeAsBytes(_annotatedImageBytes!);
-        uploadFile = tempFile;
-      }
-
       await storageService.uploadUserImage(
-        widget.imageFile, // 🔹 always the ORIGINAL image
-        annotatedImageBytes:
-            _annotatedImageBytes, // 🔹 pass annotated separately
+        widget.imageFile, // original image always
+        annotatedImageBytes: _annotatedImageBytes,
         lat: widget.selectedCoordinate.latitude,
         lng: widget.selectedCoordinate.longitude,
         address: _locationController.text.trim(),
@@ -115,12 +126,13 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         issueType: widget.issueType,
       );
 
-
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("✅ Upload successful!")));
 
-      if (mounted) Navigator.popUntil(context, (route) => route.isFirst);
+      if (mounted) {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
     } catch (e) {
       setState(() => _uploading = false);
       ScaffoldMessenger.of(
@@ -129,10 +141,15 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     }
   }
 
+  // ===================== UI =====================
+
   @override
   Widget build(BuildContext context) {
     final drainage = (_yoloResults?["drainage"] as List?) ?? [];
     final obstructions = (_yoloResults?["obstructions"] as List?) ?? [];
+
+    final double? blockagePercent = (_yoloResults?["blockage_percent"] as num?)
+        ?.toDouble();
 
     return Scaffold(
       appBar: AppBar(title: Text("Confirm ${widget.issueType} Report")),
@@ -140,6 +157,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
+            // ================= IMAGE =================
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: _annotatedImageBytes != null
@@ -157,6 +175,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 16),
 
+            // ================= COORDINATES =================
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -174,6 +193,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 16),
 
+            // ================= ADDRESS =================
             TextField(
               controller: _locationController,
               decoration: InputDecoration(
@@ -201,35 +221,59 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 16),
 
-            // 🔥 NEW: Object-based YOLO results
-            if (widget.issueType == "Drainage" &&
-                _yoloResults != null &&
-                _yoloResults!.isNotEmpty)
+            // ================= BLOCKAGE PERCENT =================
+            if (widget.issueType == "Drainage" && blockagePercent != null)
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "YOLO Detection Results",
+                        "Drainage Blockage Assessment",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
-                      const Divider(),
-
-                      Text("Status: ${_yoloResults!["status"] ?? "Unknown"}"),
-
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LinearProgressIndicator(
+                              value: blockagePercent / 100,
+                              minHeight: 10,
+                              backgroundColor: Colors.grey.shade300,
+                              color: _blockageColor(blockagePercent),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            "${blockagePercent.toStringAsFixed(1)}%",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _blockageColor(blockagePercent),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
-
-                      Text("Obstructions (${obstructions.length})"),
-                      ...obstructions.map((o) => Text("• ${o["class"]}")),
+                      Text(
+                        _blockageLabel(blockagePercent),
+                        style: TextStyle(
+                          color: _blockageColor(blockagePercent),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "This percentage estimates how much of the visible drainage area is obstructed based on image analysis.",
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
                     ],
                   ),
                 ),
@@ -237,13 +281,47 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 16),
 
+            // ================= YOLO DETAILS =================
+            // if (widget.issueType == "Drainage" &&
+            //     _yoloResults != null &&
+            //     _yoloResults!.isNotEmpty)
+            //   Card(
+            //     elevation: 2,
+            //     shape: RoundedRectangleBorder(
+            //       borderRadius: BorderRadius.circular(12),
+            //     ),
+            //     child: Padding(
+            //       padding: const EdgeInsets.all(12),
+            //       child: Column(
+            //         crossAxisAlignment: CrossAxisAlignment.start,
+            //         children: [
+            //           const Text(
+            //             "YOLO Detection Results",
+            //             style: TextStyle(
+            //               fontWeight: FontWeight.bold,
+            //               fontSize: 16,
+            //             ),
+            //           ),
+            //           const Divider(),
+            //           Text("Drainage objects: ${drainage.length}"),
+            //           const SizedBox(height: 8),
+            //           Text("Detected obstructions (${obstructions.length})"),
+            //           ...obstructions.map((o) => Text("• ${o["class"]}")),
+            //         ],
+            //       ),
+            //     ),
+            //   ),
+
+            // const SizedBox(height: 16),
+
+            // ================= NOTES =================
             TextField(
               controller: _noteController,
               maxLines: 3,
               decoration: InputDecoration(
                 labelText: "Additional Notes (optional)",
                 hintText:
-                    "Add any other details about the location or obstruction...",
+                    "Add any other details about the location or issue...",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -253,6 +331,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 24),
 
+            // ================= ACTIONS =================
             ElevatedButton.icon(
               onPressed: _uploading ? null : () => _uploadToFirebase(context),
               icon: const Icon(Icons.cloud_upload_outlined),
