@@ -49,7 +49,7 @@ const NOTES_SUGGESTIONS = [
   "Recommend regular inspection",
   "Follow-up required in",
   "No access issues encountered",
-  "Equipment used:",
+  "Equipment used:",  
   "Delays due to",
   "Coordination with",
   "Safety measures implemented",

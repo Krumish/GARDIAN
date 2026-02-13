@@ -3,6 +3,7 @@ import { collectionGroup, collection, onSnapshot, doc, getDoc, updateDoc, query,
 import { db, auth, storage } from "../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import ReportDetailsModal from './ReportDetailsModal';
+import ResolutionDetailsModal from './ResolutionDetailsModal';
 import ResolveReportModal from './ResolveReportModal';
 import { generatePDF, generateCSV, generateDOCX } from './ReportGenerate';
 
@@ -21,6 +22,7 @@ export default function Reports() {
   const [selectedReport, setSelectedReport] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(null);
   const [showResolveModal, setShowResolveModal] = useState(null);
+  const [showResolutionDetailsModal, setShowResolutionDetailsModal] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [showReportModal, setShowReportModal] = useState(false);
   const [resolvedImage, setResolvedImage] = useState(null)
@@ -30,6 +32,7 @@ export default function Reports() {
   const [typeFilter, setTypeFilter] = useState("");
   const [sortBy, setSortBy] = useState("dataDesc");
   const handleViewReport = (report) => setSelectedReport(report);
+  const handleViewResolution = (report) => setShowResolutionDetailsModal(report);
   const generateRefCode = (report) => { if (!report || !report.id) return "REF-00000000-XXXXX";
   const ts = report.uploadedAt;
   const dateObj = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
@@ -125,7 +128,7 @@ export default function Reports() {
       } else if (sortBy === "dateAsc") {
         return (a.uploadedAt?.toDate?.() || 0) - (b.uploadedAt?.toDate?.() || 0);
       } else if (sortBy === "nameAsc") {
-        return (a.userDetails?.firstName || "").localeCompare(b.userDetails?.firstName || "");
+        return (a.userDetails?.firstName || "").localeCompare(a.userDetails?.firstName || "");
       } else if (sortBy === "nameDesc") {
         return (b.userDetails?.firstName || "").localeCompare(a.userDetails?.firstName || "");
     }
@@ -413,12 +416,22 @@ const handleExportDOC = () => {
                     </button>
                   </td>
                   <td className="py-3 px-4">
-                    <button
-                      className="bg-blue-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-blue-600 transition"
-                      onClick={() => handleViewReport(report)}
-                    >
-                      View
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="bg-blue-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-blue-600 transition"
+                        onClick={() => handleViewReport(report)}
+                      >
+                        View
+                      </button>
+                      {report.status === "Resolved" && (
+                        <button
+                          className="bg-emerald-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-emerald-600 transition flex items-center gap-1"
+                          onClick={() => handleViewResolution(report)}
+                        >
+                          Resolution
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -572,7 +585,7 @@ const handleExportDOC = () => {
         </div>
       )}
 
-      {/* NEW: Systematic Resolve Report Modal */}
+      {/* Systematic Resolve Report Modal */}
       {showResolveModal && (
         <ResolveReportModal
           report={showResolveModal}
@@ -588,6 +601,14 @@ const handleExportDOC = () => {
           onClose={() => setSelectedReport(null)}
           formatDate={(ts) => ts.toDate().toLocaleDateString()}
           formatTime={(ts) => ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        />
+      )}
+
+      {/* Resolution Details Modal */}
+      {showResolutionDetailsModal && (
+        <ResolutionDetailsModal
+          selectedReport={showResolutionDetailsModal}
+          onClose={() => setShowResolutionDetailsModal(null)}
         />
       )}
     </div>
