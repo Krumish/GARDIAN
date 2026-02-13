@@ -61,7 +61,6 @@ const ReportDetailsModal = ({ selectedReport, onClose, formatDate, formatTime })
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex items-center justify-between border-b border-blue-800">
           <div>
             <h2 className="text-2xl font-bold text-white">Report Details</h2>
-            <p className="text-blue-100 text-sm mt-0.5">Case #{selectedReport.id || 'N/A'}</p>
           </div>
           <button
             onClick={onClose}
@@ -275,7 +274,7 @@ const ReportDetailsModal = ({ selectedReport, onClose, formatDate, formatTime })
                   <div className="mt-5 pt-5 border-t border-blue-200">
                     <p className="text-xs text-gray-600 text-center">
                       Analysis powered by YOLOV8 AI detection system
-                    </p>
+                    </p>  
                   </div>
                 </div>
               )}
