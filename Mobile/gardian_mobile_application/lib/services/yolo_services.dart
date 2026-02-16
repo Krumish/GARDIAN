@@ -7,10 +7,10 @@ import 'config_service.dart';
 class YoloService {
   static Future<Map<String, dynamic>> detect(File file) async {
     try {
-      // final url = await ConfigService.getYoloUrl();
-      // final uri = Uri.parse(url);
+      final url = await ConfigService.getYoloUrl();
+      final uri = Uri.parse(url);
 
-      final uri = Uri.parse("http://10.0.2.2:8000/detect/");
+      // final uri = Uri.parse("http://10.0.2.2:8000/detect/");
 
       final request = http.MultipartRequest("POST", uri);
       request.files.add(await http.MultipartFile.fromPath("file", file.path));

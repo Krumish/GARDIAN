@@ -1,19 +1,44 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from ultralytics import YOLO
-import shutil, os, base64, cv2, uuid
+import shutil
+import os
+import base64
+import cv2
+import uuid
 
 app = FastAPI()
 
-# Load YOLO model once
-model = YOLO("v5.pt")
-
-# Helper functions
+# Global model variable
+model = None
 
 
+# ----------------------------
+# STARTUP EVENT (VERY IMPORTANT FOR CLOUD RUN)
+# ----------------------------
+@app.on_event("startup")
+def load_model():
+    global model
+    print("Loading YOLO model...")
+    model = YOLO("v5.pt")
+    print("Model loaded successfully.")
+
+
+# ----------------------------
+# ROOT ENDPOINT (HEALTH CHECK)
+# ----------------------------
+@app.get("/")
+def root():
+    return {"message": "Drainage YOLO API is running"}
+
+
+# ----------------------------
+# HELPER FUNCTIONS
+# ----------------------------
 def box_area(box):
     x1, y1, x2, y2 = box
     return max(0, x2 - x1) * max(0, y2 - y1)
+
 
 def overlap_area(box1, box2):
     x1, y1, x2, y2 = box1
@@ -37,17 +62,28 @@ SEVERITY_WEIGHTS = {
     "cracks": 0.6,
 }
 
-# Detection endpoint
 
+# ----------------------------
+# DETECTION ENDPOINT
+# ----------------------------
 @app.post("/detect/")
 async def detect(file: UploadFile = File(...)):
+    global model
+
+    if model is None:
+        return JSONResponse(
+            {"error": "Model not loaded yet"},
+            status_code=503
+        )
+
+    temp_name = f"temp_{uuid.uuid4().hex}.jpg"
+
     try:
-        # Save temp image
-        temp_name = f"temp_{uuid.uuid4().hex}.jpg"
+        # Save uploaded image
         with open(temp_name, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Run YOLO
+        # Run YOLO inference
         results = model(temp_name)
 
         drainage_boxes = []
@@ -84,9 +120,7 @@ async def detect(file: UploadFile = File(...)):
                     obstruction_boxes.append(obj)
 
         # Coverage-based analysis
-
         max_blockage_ratio = 0
-        drainage_blockage_details = []
 
         for dr_box in drainage_boxes:
             dr_area = box_area(dr_box)
@@ -98,13 +132,9 @@ async def detect(file: UploadFile = File(...)):
                 blocked_area += overlap * weight
 
             ratio = blocked_area / dr_area if dr_area > 0 else 0
-            drainage_blockage_details.append(round(ratio, 3))
             max_blockage_ratio = max(max_blockage_ratio, ratio)
 
-
         # Status classification
-
-
         if len(drainage_boxes) == 0:
             status = "No Drainage Detected"
         elif max_blockage_ratio >= 0.6:
@@ -114,35 +144,20 @@ async def detect(file: UploadFile = File(...)):
         else:
             status = "Clear"
 
-        # Convert annotated image
+        # Convert annotated image to base64
         _, buffer = cv2.imencode(".jpg", annotated_image)
         encoded_image = base64.b64encode(buffer).decode("utf-8")
 
-        # Cleanup
-        if os.path.exists(temp_name):
-            os.remove(temp_name)
-
-
-        # API Response
-
-
+        # Response
         return JSONResponse({
             "status": status,
-
-            # Summary metrics
             "drainage_count": len(drainage_boxes),
             "obstruction_count": len(detected_obstructions),
             "max_blockage_ratio": round(max_blockage_ratio, 3),
             "blockage_percent": round(max_blockage_ratio * 100, 1),
-
-            # Detailed objects
             "drainage": detected_drainage,
             "obstructions": detected_obstructions,
-
-            # Raw boxes
             "boxes": boxes,
-
-            # Annotated preview
             "annotated_image": encoded_image,
         })
 
@@ -151,3 +166,8 @@ async def detect(file: UploadFile = File(...)):
             {"error": str(e)},
             status_code=500
         )
+
+    finally:
+        # Cleanup temp file
+        if os.path.exists(temp_name):
+            os.remove(temp_name)
