@@ -57,15 +57,15 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
   // ===================== HELPERS =====================
 
   String _blockageLabel(double percent) {
-    if (percent < 30) return "Low blockage";
-    if (percent < 60) return "Moderate blockage";
-    return "Severe blockage";
+    if (percent >= 60) return "Clogged";
+    if (percent >= 25) return "Partially Blocked";
+    return "Clear";
   }
 
   Color _blockageColor(double percent) {
-    if (percent < 30) return Colors.green;
-    if (percent < 60) return Colors.orange;
-    return Colors.red;
+    if (percent >= 60) return Colors.red;
+    if (percent >= 25) return Colors.orange;
+    return Colors.green;
   }
 
   // ===================== LOCATION =====================

@@ -27,9 +27,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   }
 
   String _blockageLabel(double percent) {
-    if (percent >= 60) return "Severely Blocked Drainage";
-    if (percent >= 25) return "Partially Blocked Drainage";
-    return "Clear Drainage";
+    if (percent >= 60) return "Clogged";
+    if (percent >= 25) return "Partially Blocked";
+    return "Clear";
   }
 
   @override
