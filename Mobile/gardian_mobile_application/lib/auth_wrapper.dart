@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'services/auth_services.dart';
-import 'screens/home/home_page.dart';
+import 'main_wrapper.dart';
 import 'screens/auth/login_page.dart';
 import 'onboarding_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -44,7 +44,7 @@ class AuthWrapper extends StatelessWidget {
             final seenOnboarding = data?["seen_onboarding"] == true;
 
             if (seenOnboarding) {
-              return const HomePage();
+              return const MainWrapper();
             } else {
               return const OnboardingPage();
             }
