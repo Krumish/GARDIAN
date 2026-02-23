@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from ultralytics import YOLO
 import shutil
@@ -9,165 +9,107 @@ import uuid
 
 app = FastAPI()
 
-# Global model variable
-model = None
+# Global dictionary to store loaded models
+models = {}
 
-
-# ----------------------------
-# STARTUP EVENT (VERY IMPORTANT FOR CLOUD RUN)
-# ----------------------------
 @app.on_event("startup")
-def load_model():
-    global model
-    print("Loading YOLO model...")
-    model = YOLO("v5.pt")
-    print("Model loaded successfully.")
+def load_models():
+    global models
+    print("Loading YOLO models...")
+    # .pt files 
+    models["Drainage"] = YOLO("v5.pt")  
+    models["Pothole"] = YOLO("pothole_v2.pt")    
+    print(f"Models loaded: {list(models.keys())}")
 
-
-# ----------------------------
-# ROOT ENDPOINT (HEALTH CHECK)
-# ----------------------------
-@app.get("/")
-def root():
-    return {"message": "Drainage YOLO API is running"}
-
-
-# ----------------------------
-# HELPER FUNCTIONS
-# ----------------------------
+# --- Helper Functions from your existing logic ---
 def box_area(box):
     x1, y1, x2, y2 = box
     return max(0, x2 - x1) * max(0, y2 - y1)
 
-
 def overlap_area(box1, box2):
     x1, y1, x2, y2 = box1
     a1, b1, a2, b2 = box2
-
-    ix1 = max(x1, a1)
-    iy1 = max(y1, b1)
-    ix2 = min(x2, a2)
-    iy2 = min(y2, b2)
-
+    ix1, iy1 = max(x1, a1), max(y1, b1)
+    ix2, iy2 = min(x2, a2), min(y2, b2)
     if ix1 < ix2 and iy1 < iy2:
         return (ix2 - ix1) * (iy2 - iy1)
     return 0
 
-
 SEVERITY_WEIGHTS = {
-    "rocks": 1.0,
-    "silt": 0.9,
-    "trash": 0.7,
-    "leaves": 0.4,
-    "cracks": 0.6,
+    "rocks": 1.0, "silt": 0.9, "trash": 0.7, "leaves": 0.4, "cracks": 0.6,
 }
 
-
-# ----------------------------
-# DETECTION ENDPOINT
-# ----------------------------
 @app.post("/detect/")
-async def detect(file: UploadFile = File(...)):
-    global model
+async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
+    if issue_type not in models:
+        return JSONResponse({"error": f"Invalid issue_type: {issue_type}"}, status_code=400)
 
-    if model is None:
-        return JSONResponse(
-            {"error": "Model not loaded yet"},
-            status_code=503
-        )
-
+    model = models[issue_type]
     temp_name = f"temp_{uuid.uuid4().hex}.jpg"
 
     try:
-        # Save uploaded image
         with open(temp_name, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Run YOLO inference
         results = model(temp_name)
-
-        drainage_boxes = []
-        obstruction_boxes = []
-
-        detected_drainage = []
-        detected_obstructions = []
-        boxes = []
-
-        # Annotated image
-        annotated_image = results[0].plot()
-
-        # Extract detections
+        annotated_image = results[0].plot(conf=False, labels=True, boxes=True)
+        
+        # General detection data
+        all_boxes = []
         for r in results:
             for box in r.boxes:
-                cls = r.names[int(box.cls)].lower()
-                conf = float(box.conf)
-                xyxy = box.xyxy[0].tolist()
+                all_boxes.append({
+                    "class": r.names[int(box.cls)].lower(),
+                    "confidence": round(float(box.conf), 3),
+                    "box": box.xyxy[0].tolist()
+                })
 
-                obj = {
-                    "class": cls,
-                    "confidence": round(conf, 3),
-                    "box": xyxy
-                }
 
-                boxes.append(obj)
 
-                if cls == "drainages":
-                    detected_drainage.append(obj)
-                    drainage_boxes.append(xyxy)
+        # --- RESPONSE OBJECT INITIALIZATION ---
+        response_data = {
+            "issue_type": issue_type,
+            "detection_count": len(all_boxes),
+            "boxes": all_boxes,
+        }
 
-                elif cls in SEVERITY_WEIGHTS:
-                    detected_obstructions.append(obj)
-                    obstruction_boxes.append(obj)
+        # --- SPECIAL LOGIC FOR DRAINAGE ---
+        if issue_type == "Drainage":
+            drainage_boxes = [b["box"] for b in all_boxes if b["class"] == "drainages"]
+            obstructions = [b for b in all_boxes if b["class"] in SEVERITY_WEIGHTS]
+            
+            max_blockage_ratio = 0
+            for dr_box in drainage_boxes:
+                dr_area = box_area(dr_box)
+                blocked_area = sum(overlap_area(obs["box"], dr_box) * SEVERITY_WEIGHTS.get(obs["class"], 0.5) for obs in obstructions)
+                ratio = blocked_area / dr_area if dr_area > 0 else 0
+                max_blockage_ratio = max(max_blockage_ratio, ratio)
 
-        # Coverage-based analysis
-        max_blockage_ratio = 0
+            # Apply statuses defined in your existing code
+            if not drainage_boxes: status = "No Drainage Detected"
+            elif max_blockage_ratio >= 0.6: status = "Clogged"
+            elif max_blockage_ratio >= 0.25: status = "Partially Blocked"
+            else: status = "Clear"
 
-        for dr_box in drainage_boxes:
-            dr_area = box_area(dr_box)
-            blocked_area = 0
-
-            for obs in obstruction_boxes:
-                overlap = overlap_area(obs["box"], dr_box)
-                weight = SEVERITY_WEIGHTS.get(obs["class"], 0.5)
-                blocked_area += overlap * weight
-
-            ratio = blocked_area / dr_area if dr_area > 0 else 0
-            max_blockage_ratio = max(max_blockage_ratio, ratio)
-
-        # Status classification
-        if len(drainage_boxes) == 0:
-            status = "No Drainage Detected"
-        elif max_blockage_ratio >= 0.6:
-            status = "Clogged"
-        elif max_blockage_ratio >= 0.25:
-            status = "Partially Blocked"
+            response_data.update({
+                "status": status,
+                "blockage_percent": round(max_blockage_ratio * 100, 1),
+                "max_blockage_ratio": round(max_blockage_ratio, 3),
+                "drainage": [b for b in all_boxes if b["class"] == "drainages"],
+                "obstructions": obstructions
+            })
         else:
-            status = "Clear"
+            # Logic for Potholes and other models (Detection only)
+            response_data.update({
+                "status": "Detected" if all_boxes else "Clear",
+                "blockage_percent": None # Ensures Flutter app doesn't crash
+            })
 
-        # Convert annotated image to base64
+        # Encode image
         _, buffer = cv2.imencode(".jpg", annotated_image)
-        encoded_image = base64.b64encode(buffer).decode("utf-8")
+        response_data["annotated_image"] = base64.b64encode(buffer).decode("utf-8")
 
-        # Response
-        return JSONResponse({
-            "status": status,
-            "drainage_count": len(drainage_boxes),
-            "obstruction_count": len(detected_obstructions),
-            "max_blockage_ratio": round(max_blockage_ratio, 3),
-            "blockage_percent": round(max_blockage_ratio * 100, 1),
-            "drainage": detected_drainage,
-            "obstructions": detected_obstructions,
-            "boxes": boxes,
-            "annotated_image": encoded_image,
-        })
-
-    except Exception as e:
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=500
-        )
+        return JSONResponse(response_data)
 
     finally:
-        # Cleanup temp file
-        if os.path.exists(temp_name):
-            os.remove(temp_name)
+        if os.path.exists(temp_name): os.remove(temp_name)

@@ -11,3 +11,13 @@
 
 # on a new terminal
 # ngrok http 5000
+
+# FOR updating
+
+gcloud run deploy drainage-api \
+  --source . \
+  --region asia-southeast1 \
+  --memory 2Gi \
+  --cpu 2 \
+  --timeout 900 \
+  --allow-unauthenticated
