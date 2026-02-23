@@ -75,32 +75,18 @@ class _LocationPageState extends State<LocationPage> {
 
     setState(() => _processing = true);
 
-    // 🔥 RUN YOLO ONLY WHEN DRAINAGE IS SELECTED
-    if (widget.issueType == "Drainage") {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AnalysisLoadingPage(
-            imageFile: widget.imageFile,
-            selectedCoordinate: _selectedCoordinate!,
-            issueType: widget.issueType,
-          ),
+    // ✅ REMOVED the "if Drainage" check.
+    // All issues (Pothole, Drainage, etc.) now go to the Analysis page.
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnalysisLoadingPage(
+          imageFile: widget.imageFile,
+          selectedCoordinate: _selectedCoordinate!,
+          issueType: widget.issueType,
         ),
-      );
-    } else {
-      // 🔥 SKIP YOLO → GO DIRECTLY TO CONFIRMATION PAGE
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ConfirmationPage(
-            imageFile: widget.imageFile,
-            selectedCoordinate: _selectedCoordinate!,
-            yoloResults: null, // no YOLO for non-drainage
-            issueType: widget.issueType,
-          ),
-        ),
-      );
-    }
+      ),
+    );
 
     setState(() => _processing = false);
   }

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 
@@ -30,7 +29,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
   Map<String, dynamic>? _yoloResults;
   bool _uploading = false;
   bool _isFetchingAddress = false;
-  Uint8List? _annotatedImageBytes;
+  File? _annotatedFile;
 
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
@@ -40,15 +39,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     super.initState();
     _yoloResults = widget.yoloResults;
 
-    // Decode annotated image (if present)
-    if (_yoloResults?["annotated_image"] != null) {
-      try {
-        _annotatedImageBytes = base64Decode(
-          _yoloResults!["annotated_image"] as String,
-        );
-      } catch (e) {
-        debugPrint("⚠️ Failed to decode annotated image: $e");
-      }
+    // 🔹 OPTIMIZED: Use the pre-saved file from YoloService/AnalysisLoadingPage
+    if (_yoloResults?["annotatedFile"] != null) {
+      _annotatedFile = _yoloResults!["annotatedFile"] as File;
     }
 
     _fetchAddressFromCoordinates();
@@ -111,13 +104,11 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
     try {
       setState(() => _uploading = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("☁️ Uploading to Firebase...")),
-      );
 
+      // Pass both the original file and the results to storage service
       await storageService.uploadUserImage(
-        widget.imageFile, // original image always
-        annotatedImageBytes: _annotatedImageBytes,
+        widget.imageFile,
+        annotatedImageFile: _annotatedFile, // Sending the File instead of bytes
         lat: widget.selectedCoordinate.latitude,
         lng: widget.selectedCoordinate.longitude,
         address: _locationController.text.trim(),
@@ -126,11 +117,10 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         issueType: widget.issueType,
       );
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("✅ Upload successful!")));
-
       if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("✅ Upload successful!")));
         Navigator.popUntil(context, (route) => route.isFirst);
       }
     } catch (e) {
@@ -141,13 +131,31 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     }
   }
 
-  // ===================== UI =====================
+  // ===================== UI COMPONENTS =====================
+
+  Widget _buildDetectionSummary(List boxes) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: const Icon(Icons.analytics_outlined, color: Colors.blue),
+        title: Text("${widget.issueType} Report Status"),
+        subtitle: Text(
+          boxes.isNotEmpty
+              ? "${_yoloResults?['status'] ?? 'Detected'} (${boxes.length} objects)"
+              : "No anomalies detected",
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final drainage = (_yoloResults?["drainage"] as List?) ?? [];
-    final obstructions = (_yoloResults?["obstructions"] as List?) ?? [];
+    // General detection list for any model (Potholes, Road Markings, etc.)
+    final allBoxes = (_yoloResults?["boxes"] as List?) ?? [];
 
+    // Drainage-specific data
     final double? blockagePercent = (_yoloResults?["blockage_percent"] as num?)
         ?.toDouble();
 
@@ -160,12 +168,12 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
             // ================= IMAGE =================
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: _annotatedImageBytes != null
-                  ? Image.memory(
-                      _annotatedImageBytes!,
+              child: _annotatedFile != null
+                  ? Image.file(
+                      _annotatedFile!,
                       height: 250,
                       fit: BoxFit.cover,
-                    )
+                    ) // Use Image.file
                   : Image.file(
                       widget.imageFile,
                       height: 250,
@@ -175,53 +183,12 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 16),
 
-            // ================= COORDINATES =================
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.location_on, color: Colors.red),
-                title: const Text("Selected Coordinates"),
-                subtitle: Text(
-                  "Lat: ${widget.selectedCoordinate.latitude.toStringAsFixed(6)}, "
-                  "Lng: ${widget.selectedCoordinate.longitude.toStringAsFixed(6)}",
-                ),
-              ),
-            ),
+            // ================= DETECTION SUMMARY (Visible for all types) =================
+            _buildDetectionSummary(allBoxes),
 
             const SizedBox(height: 16),
 
-            // ================= ADDRESS =================
-            TextField(
-              controller: _locationController,
-              decoration: InputDecoration(
-                labelText: "Location / Address",
-                hintText: "Fetching address...",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.location_on_outlined),
-                suffixIcon: _isFetchingAddress
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: _fetchAddressFromCoordinates,
-                      ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ================= BLOCKAGE PERCENT =================
+            // ================= BLOCKAGE ASSESSMENT (Drainage Only) =================
             if (widget.issueType == "Drainage" && blockagePercent != null)
               Card(
                 elevation: 2,
@@ -269,11 +236,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "This percentage estimates how much of the visible drainage area is obstructed based on image analysis.",
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
                     ],
                   ),
                 ),
@@ -281,47 +243,36 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
             const SizedBox(height: 16),
 
-            // ================= YOLO DETAILS =================
-            // if (widget.issueType == "Drainage" &&
-            //     _yoloResults != null &&
-            //     _yoloResults!.isNotEmpty)
-            //   Card(
-            //     elevation: 2,
-            //     shape: RoundedRectangleBorder(
-            //       borderRadius: BorderRadius.circular(12),
-            //     ),
-            //     child: Padding(
-            //       padding: const EdgeInsets.all(12),
-            //       child: Column(
-            //         crossAxisAlignment: CrossAxisAlignment.start,
-            //         children: [
-            //           const Text(
-            //             "YOLO Detection Results",
-            //             style: TextStyle(
-            //               fontWeight: FontWeight.bold,
-            //               fontSize: 16,
-            //             ),
-            //           ),
-            //           const Divider(),
-            //           Text("Drainage objects: ${drainage.length}"),
-            //           const SizedBox(height: 8),
-            //           Text("Detected obstructions (${obstructions.length})"),
-            //           ...obstructions.map((o) => Text("• ${o["class"]}")),
-            //         ],
-            //       ),
-            //     ),
-            //   ),
+            // ================= LOCATION/ADDRESS =================
+            TextField(
+              controller: _locationController,
+              decoration: InputDecoration(
+                labelText: "Location / Address",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.location_on_outlined),
+                suffixIcon: _isFetchingAddress
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _fetchAddressFromCoordinates,
+                      ),
+              ),
+            ),
 
-            // const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // ================= NOTES =================
             TextField(
               controller: _noteController,
-              maxLines: 3,
+              maxLines: 2,
               decoration: InputDecoration(
                 labelText: "Additional Notes (optional)",
-                hintText:
-                    "Add any other details about the location or issue...",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -338,7 +289,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
               label: Text(_uploading ? "Uploading..." : "Confirm & Upload"),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(fontSize: 16),
               ),
             ),
 

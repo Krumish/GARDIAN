@@ -32,52 +32,47 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
   Future<void> _runAnalysis() async {
     try {
-      // 🚫 Skip YOLO for non-drainage issues
-      if (widget.issueType != "Drainage") {
-        _goToConfirmation(null);
-        return;
-      }
-
-      final results = await YoloService.detect(widget.imageFile);
+      // 1️⃣ CALL BACKEND: Pass the issueType so FastAPI selects the right model
+      final results = await YoloService.detect(
+        widget.imageFile,
+        widget.issueType,
+      );
 
       if (!mounted) return;
 
-      // ❗ Backend error?
       if (results.containsKey("error")) {
-        return _triggerError("Unable to analyze the image.");
+        return _triggerError("Server Error: ${results["error"]}");
       }
 
-      final drainageList = results["drainage"] as List? ?? [];
-      final obstructionList = results["obstructions"] as List? ?? [];
+      // 2️⃣ GENERAL DETECTION CHECK
+      // In our updated Python code, every model returns a 'boxes' list
+      final allBoxes = results["boxes"] as List? ?? [];
 
-      // no objects detected at all
-      if (drainageList.isEmpty && obstructionList.isEmpty) {
+      if (allBoxes.isEmpty) {
         return _triggerError(
-          "No drainage or obstruction detected.\nPlease upload a clearer image.",
+          "No ${widget.issueType} anomalies detected.\nPlease upload a clearer image.",
         );
       }
 
+      // 3️⃣ PREPARE SUMMARY (Works for both Drainage and Pothole)
       final yoloSummary = {
         "status": results["status"],
-
-        // 🔢 summary metrics
+        "boxes": allBoxes, // Save all raw detections
+        // Drainage-specific metrics (will be null for Potholes)
         "blockage_percent": results["blockage_percent"],
         "max_blockage_ratio": results["max_blockage_ratio"],
-        "drainage_count": results["drainage_count"],
-        "obstruction_count": results["obstruction_count"],
+        "drainage": results["drainage"],
+        "obstructions": results["obstructions"],
 
-        // 🧾 objects
-        "drainage": drainageList,
-        "obstructions": obstructionList,
-
-        // 🖼 image
         "annotated_image": results["annotated_image"],
+        "annotatedFile":
+            results["annotatedFile"], // The file we created in YoloService
       };
 
       _goToConfirmation(yoloSummary);
     } catch (e) {
       if (!mounted) return;
-      _triggerError("Invalid or unreadable image.");
+      _triggerError("Failed to reach the analysis server.");
     }
   }
 

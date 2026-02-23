@@ -1,8 +1,7 @@
 import 'dart:io';
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'auth_services.dart';
 
@@ -12,7 +11,7 @@ class StorageService {
 
   Future<void> uploadUserImage(
     File file, {
-    Uint8List? annotatedImageBytes,
+    File? annotatedImageFile, // 🔹 Updated from Uint8List to File
     Map<String, dynamic>? yoloResults,
     double? lat,
     double? lng,
@@ -25,32 +24,36 @@ class StorageService {
 
     final uploadId = const Uuid().v4();
 
+    // 1. Upload Original Image
     final ref = _storage.ref().child("user_uploads/$uid/$uploadId.jpg");
     await ref.putFile(file);
     final url = await ref.getDownloadURL();
 
     String? annotatedUrl;
 
-    // 🔹 upload annotated ONLY if present
-    if (annotatedImageBytes != null) {
+    // 2. Upload Annotated Image ONLY if present
+    if (annotatedImageFile != null && await annotatedImageFile.exists()) {
       try {
         final annotatedRef = _storage.ref().child(
           "user_uploads/$uid/${uploadId}_annotated.jpg",
         );
 
-        await annotatedRef.putData(
-          annotatedImageBytes,
+        // 🔹 Use putFile (Streaming upload from disk)
+        await annotatedRef.putFile(
+          annotatedImageFile,
           SettableMetadata(contentType: "image/jpeg"),
         );
 
         annotatedUrl = await annotatedRef.getDownloadURL();
       } catch (e) {
-        // ignore annotated upload failure
+        debugPrint("Upload error: $e");
       }
     }
 
+    // 3. Clean up the YOLO results before saving to Firestore
     final cleanYolo = _sanitizeYoloResults(yoloResults);
 
+    // 4. Save to Firestore
     await _firestore
         .collection("users")
         .doc(uid)
@@ -61,10 +64,10 @@ class StorageService {
           "annotatedUrl": annotatedUrl,
           "uploadedAt": FieldValue.serverTimestamp(),
 
-          // 🔍 Full YOLO payload (for audit & review)
+          // 🔍 Full YOLO payload
           "yolo": cleanYolo,
 
-          // 🔢 PROMOTED YOLO METRICS (IMPORTANT)
+          // 🔢 Promoted Metrics
           "blockagePercent": cleanYolo["blockage_percent"],
           "blockageRatio": cleanYolo["max_blockage_ratio"],
           "drainageCount": cleanYolo["drainage_count"],
@@ -78,15 +81,19 @@ class StorageService {
           "note": note,
           "issueType": issueType ?? "Unknown",
 
-          // 🚦 Workflow status
           "status": "Pending",
         });
   }
 
   Map<String, dynamic> _sanitizeYoloResults(Map<String, dynamic>? results) {
     if (results == null) return {};
+
     final sanitized = Map<String, dynamic>.from(results);
+
+    // 🔹 REMOVE non-storable objects (Files and Base64 strings)
     sanitized.remove("annotated_image");
+    sanitized.remove("annotatedFile");
+
     sanitized.updateAll((key, value) {
       if (value is int ||
           value is double ||
@@ -108,14 +115,6 @@ class StorageService {
         .collection("uploads")
         .orderBy("uploadedAt", descending: true)
         .snapshots();
-  }
-
-  Future<String> uploadTempImage(File imageFile) async {
-    final ref = FirebaseStorage.instance.ref(
-      'temp_uploads/${DateTime.now().millisecondsSinceEpoch}.jpg',
-    );
-    await ref.putFile(imageFile);
-    return await ref.getDownloadURL();
   }
 }
 
