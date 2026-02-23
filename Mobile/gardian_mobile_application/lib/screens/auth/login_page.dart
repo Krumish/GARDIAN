@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../auth_wrapper.dart';
 import '../../services/auth_services.dart';
 import 'register_page.dart';
 import '../../widgets/custom_text_field.dart';
@@ -24,12 +25,23 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+
+      if (mounted) {
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const AuthWrapper()),
+          (route) => false,
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login Failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Login Failed: $e')));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

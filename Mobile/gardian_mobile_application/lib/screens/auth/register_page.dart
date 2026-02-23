@@ -15,13 +15,33 @@ class _RegisterPageState extends State<RegisterPage> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _barangayController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  // 🔹 Dropdown state
+  String? _selectedBarangay;
   bool _isLoading = false;
 
+  // 🔹 List of Cainta Barangays
+  final List<String> _caintaBarangays = [
+    "San Andres (Poblacion)",
+    "San Roque",
+    "San Juan",
+    "Santo Domingo",
+    "Santo Niño",
+    "San Isidro",
+    "Santa Rosa",
+  ];
+
   void _sendOtp() async {
+    // 🔹 Simple validation for the dropdown
+    if (_selectedBarangay == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Please select a Barangay")));
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     await authService.value.sendOtp(
@@ -38,7 +58,7 @@ class _RegisterPageState extends State<RegisterPage> {
               password: _passwordController.text.trim(),
               firstName: _firstNameController.text.trim(),
               lastName: _lastNameController.text.trim(),
-              barangay: _barangayController.text.trim(),
+              barangay: _selectedBarangay!, // 🔹 Pass the selected value
               phone: _phoneController.text.trim(),
             ),
           ),
@@ -63,7 +83,6 @@ class _RegisterPageState extends State<RegisterPage> {
             const SizedBox(height: 30),
             Image.asset("assets/icons/GARDIAN.png", height: 160),
             const SizedBox(height: 20),
-
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -109,10 +128,62 @@ class _RegisterPageState extends State<RegisterPage> {
                         hintText: "Email",
                       ),
                       const SizedBox(height: 12),
-                      CustomTextField(
-                        controller: _barangayController,
-                        hintText: "Barangay",
+
+                      DropdownButtonFormField<String>(
+                        value: _selectedBarangay,
+                        // 🔹 Use the same hint style as your CustomTextField
+                        hint: const Text(
+                          "Select Barangay",
+                          style: TextStyle(color: Colors.black87, fontSize: 16),
+                        ),
+
+                        dropdownColor: Colors.white,
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: Colors.grey,
+                        ),
+
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.grey[100], // Match fillColor
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 18,
+                            horizontal: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              14,
+                            ), // Match border radius
+                            borderSide: BorderSide.none,
+                          ),
+                          // Optional: Add a subtle border like a TextField when focused
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+
+                        // 🔹 Standard Text style for the selected item
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                          fontFamily: 'Roboto', // Or your app's font
+                        ),
+
+                        items: _caintaBarangays.map((String barangay) {
+                          return DropdownMenuItem<String>(
+                            value: barangay,
+                            child: Text(barangay),
+                          );
+                        }).toList(),
+
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedBarangay = newValue;
+                          });
+                        },
                       ),
+
                       const SizedBox(height: 12),
                       CustomTextField(
                         controller: _phoneController,
@@ -151,7 +222,6 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                         ),
                       ),
-
                       const SizedBox(height: 12),
                       Center(
                         child: Row(
