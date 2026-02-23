@@ -16,15 +16,13 @@ class YoloService {
       // final url = await ConfigService.getYoloUrl();
       // final uri = Uri.parse(url);
 
-      // For local testing on Android Emulator, 10.0.2.2 points to your computer's localhost
+      // For local testing on Android Emulator
       final uri = Uri.parse("http://10.0.2.2:8000/detect/");
 
       final request = http.MultipartRequest("POST", uri);
 
-      // 🔹 NEW: Add the issue_type field so the backend selects the correct model
       request.fields['issue_type'] = issueType;
 
-      // Attach the image file as before
       request.files.add(await http.MultipartFile.fromPath("file", file.path));
 
       final response = await request.send();
@@ -37,8 +35,8 @@ class YoloService {
           // 1. Decode Base64 to bytes
           final bytes = base64Decode(decoded["annotated_image"]);
 
-          // 2. Get the temp directory on the phone
-          final dir = await getTemporaryDirectory();
+          // 2. Get the directory on the phone
+          final dir = await getApplicationDocumentsDirectory();
 
           // 3. Create a physical file path
           final annotatedFile = File(
@@ -46,9 +44,9 @@ class YoloService {
           );
 
           // 4. SAVE BYTES TO DISK
-          await annotatedFile.writeAsBytes(bytes);
+          await annotatedFile.writeAsBytes(bytes, flush: true);
 
-          // 5. Store the FILE object in the map (ignore the base64 string from now on)
+          // 5. Store the FILE object in the map
           decoded["annotatedFile"] = annotatedFile;
         }
         return decoded;

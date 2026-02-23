@@ -108,7 +108,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
       // Pass both the original file and the results to storage service
       await storageService.uploadUserImage(
         widget.imageFile,
-        annotatedImageFile: _annotatedFile, // Sending the File instead of bytes
+        annotatedImageFile: _annotatedFile, 
         lat: widget.selectedCoordinate.latitude,
         lng: widget.selectedCoordinate.longitude,
         address: _locationController.text.trim(),
