@@ -96,7 +96,9 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
                 "blockage_percent": round(max_blockage_ratio * 100, 1),
                 "max_blockage_ratio": round(max_blockage_ratio, 3),
                 "drainage": [b for b in all_boxes if b["class"] == "drainages"],
-                "obstructions": obstructions
+                "obstructions": obstructions,
+                "drainage_count": len(drainage_boxes),
+                "obstruction_count": len(obstructions)
             })
         else:
             # Logic for Potholes and other models (Detection only)
