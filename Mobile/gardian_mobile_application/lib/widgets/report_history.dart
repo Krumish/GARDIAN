@@ -5,7 +5,10 @@ import '../services/auth_services.dart';
 import '../services/storage_service.dart';
 
 class ReportHistory extends StatelessWidget {
-  const ReportHistory({super.key});
+  // 🔹 1. Changed from String to Set<String> to support multiple selections
+  final Set<String> selectedFilters;
+
+  const ReportHistory({super.key, required this.selectedFilters});
 
   @override
   Widget build(BuildContext context) {
@@ -31,10 +34,34 @@ class ReportHistory extends StatelessWidget {
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text("No reports yet"));
+                return _buildEmptyState("No reports yet", Icons.folder_open);
               }
 
-              final uploads = snapshot.data!.docs;
+              // 🔹 2. Updated multi-filter logic
+              final allUploads = snapshot.data!.docs;
+              final uploads = allUploads.where((doc) {
+                // If nothing is selected, or "All" is selected, show everything
+                if (selectedFilters.isEmpty ||
+                    selectedFilters.contains("All")) {
+                  return true;
+                }
+
+                final data = doc.data() as Map<String, dynamic>;
+                final status = data['status'] ?? "Pending";
+                final issueType = data['issueType'] ?? "Unknown";
+
+                // Show the document if its status OR its issueType is in the selected filters
+                return selectedFilters.contains(status) ||
+                    selectedFilters.contains(issueType);
+              }).toList();
+
+              // 🔹 3. Show empty state if the filter results in 0 items
+              if (uploads.isEmpty) {
+                return _buildEmptyState(
+                  "No reports match the selected filters",
+                  Icons.search_off,
+                );
+              }
 
               return ListView.builder(
                 itemCount: uploads.length,
@@ -51,6 +78,7 @@ class ReportHistory extends StatelessWidget {
                   final obstructions =
                       (yolo['obstructions'] as List?)?.length ?? 0;
 
+                  // 🔹 4. Added Explicit "Withdrawn" Color
                   Color statusColor;
                   switch (status) {
                     case "Pending":
@@ -58,6 +86,10 @@ class ReportHistory extends StatelessWidget {
                       break;
                     case "Resolved":
                       statusColor = Colors.green;
+                      break;
+                    case "Withdrawn":
+                      statusColor =
+                          Colors.blueGrey; // Added distinct color for Withdrawn
                       break;
                     default:
                       statusColor = Colors.grey;
@@ -176,6 +208,23 @@ class ReportHistory extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  // Helper widget for a cleaner empty state
+  Widget _buildEmptyState(String message, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 60, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
     );
   }
 }

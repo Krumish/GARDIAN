@@ -65,7 +65,7 @@ class CustomDrawer extends StatelessWidget {
 
             const Divider(color: Colors.white54, indent: 20, endIndent: 20),
 
-            // 🚪 Log Out (Still uses a standard function because it exits the app)
+            // 🚪 Log Out
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.white),
               title: const Text(
@@ -74,6 +74,9 @@ class CustomDrawer extends StatelessWidget {
               ),
               onTap: () async {
                 Navigator.pop(context);
+
+                Navigator.of(context).popUntil((route) => route.isFirst);
+
                 await authService.value.signOut();
               },
             ),
