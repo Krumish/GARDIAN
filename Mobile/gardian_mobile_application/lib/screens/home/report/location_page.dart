@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'analysis_loading_page.dart';
+import 'confirmation_page.dart'; // 🔹 ADDED: Import the confirmation page
 
 class LocationPage extends StatefulWidget {
   final File imageFile;
   final String issueType;
+  final bool requiresAI; // 🔹 ADDED: Flag to determine routing
 
   const LocationPage({
     super.key,
     required this.imageFile,
     required this.issueType,
+    required this.requiresAI, // 🔹 Make it required
   });
 
   @override
@@ -33,7 +36,6 @@ class _LocationPageState extends State<LocationPage> {
   Future<void> _initCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // 🔹 FIX: Stop loading if service is disabled
       if (mounted) setState(() => _loading = false);
       return;
     }
@@ -85,23 +87,38 @@ class _LocationPageState extends State<LocationPage> {
 
     setState(() => _processing = true);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AnalysisLoadingPage(
-          imageFile: widget.imageFile,
-          selectedCoordinate: _selectedCoordinate!,
-          issueType: widget.issueType,
+    // 🔹 THE FORK IN THE ROAD: YOLO vs MANUAL
+    if (widget.requiresAI) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AnalysisLoadingPage(
+            imageFile: widget.imageFile,
+            selectedCoordinate: _selectedCoordinate!,
+            issueType: widget.issueType,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConfirmationPage(
+            imageFile: widget.imageFile,
+            selectedCoordinate: _selectedCoordinate!,
+            issueType: widget.issueType,
+            yoloResults: null, // 🔹 Bypass YOLO, pass null for AI results
+          ),
+        ),
+      );
+    }
 
     setState(() => _processing = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    const navyColor = Color(0xFF122D5A);
+    const navyColor = Color(0xFF162447); // 🔹 Updated to new global theme
 
     return Scaffold(
       appBar: AppBar(
@@ -133,10 +150,8 @@ class _LocationPageState extends State<LocationPage> {
                 // 🔹 Full Screen Map
                 GoogleMap(
                   onMapCreated: (controller) => _mapController = controller,
-                  myLocationEnabled:
-                      true, // Shows the blue dot for the user's actual location
-                  myLocationButtonEnabled:
-                      false, // We will build a custom button later if needed
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false,
                   compassEnabled: false,
                   mapToolbarEnabled: false,
                   initialCameraPosition: CameraPosition(
@@ -209,19 +224,27 @@ class _LocationPageState extends State<LocationPage> {
                   right: 24,
                   child: SizedBox(
                     width: double.infinity,
-                    height: 55, // Consistent button height
+                    height: 55,
                     child: ElevatedButton.icon(
                       onPressed: (_processing || _selectedCoordinate == null)
                           ? null
                           : _processAndConfirm,
+                      // 🔹 DYNAMIC ICON based on flag
                       icon: _processing
                           ? const SizedBox.shrink()
-                          : const Icon(Icons.analytics_outlined),
+                          : Icon(
+                              widget.requiresAI
+                                  ? Icons.analytics_outlined
+                                  : Icons.arrow_forward_rounded,
+                            ),
+                      // 🔹 DYNAMIC TEXT based on flag
                       label: _processing
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              "Analyze Issue",
-                              style: TextStyle(
+                          : Text(
+                              widget.requiresAI
+                                  ? "Analyze Issue"
+                                  : "Proceed to Report",
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),

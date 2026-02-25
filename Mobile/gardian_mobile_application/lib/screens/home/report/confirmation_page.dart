@@ -1,9 +1,7 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
-
 import '../../../services/storage_service.dart';
 
 class ConfirmationPage extends StatefulWidget {
@@ -115,7 +113,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
       );
 
       if (mounted) {
-        // 🔹 Modern Success SnackBar
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Row(
@@ -200,9 +197,34 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     );
   }
 
+  // 🔹 NEW: Manual Label for non-AI reports
+  Widget _buildManualLabel(Color brandColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.blue.withOpacity(0.1), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.assignment_turned_in_rounded, color: Colors.blue),
+          const SizedBox(width: 12),
+          Text(
+            "Manual Report: ${widget.issueType}",
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.blue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    const navyColor = Color(0xFF122D5A);
+    const navyColor = Color(0xFF162447); // 🔹 Updated Navy Theme
     final allBoxes = (_yoloResults?["boxes"] as List?) ?? [];
     final double? blockagePercent = (_yoloResults?["blockage_percent"] as num?)
         ?.toDouble();
@@ -249,11 +271,15 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
               ),
               const SizedBox(height: 24),
 
-              // ================= DETECTION SUMMARY =================
-              _buildDetectionSummary(allBoxes, navyColor),
+              // ================= DYNAMIC SUMMARY (AI VS MANUAL) =================
+              if (widget.yoloResults != null)
+                _buildDetectionSummary(allBoxes, navyColor)
+              else
+                _buildManualLabel(navyColor),
+
               const SizedBox(height: 16),
 
-              // ================= BLOCKAGE ASSESSMENT (Drainage Only) =================
+              // ================= BLOCKAGE ASSESSMENT (AI Drainage Only) =================
               if (widget.issueType == "Drainage" &&
                   blockagePercent != null) ...[
                 Container(
@@ -384,7 +410,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                     borderSide: const BorderSide(color: navyColor, width: 2),
                   ),
                   prefixIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 40), // Aligns icon to top
+                    padding: EdgeInsets.only(bottom: 40),
                     child: Icon(Icons.notes_rounded, color: navyColor),
                   ),
                 ),
@@ -418,7 +444,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                           ),
                         ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green, // Action Green
+                    backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     elevation: 4,
@@ -443,7 +469,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20), // Bottom padding
+              const SizedBox(height: 20),
             ],
           ),
         ),

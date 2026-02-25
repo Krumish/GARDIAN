@@ -4,45 +4,58 @@ import 'photo_selection_page.dart';
 class IssueTypeSelectionPage extends StatelessWidget {
   const IssueTypeSelectionPage({super.key});
 
+  static const Color _navyColor = Color(0xFF162447);
+
   static const List<Map<String, dynamic>> issueTypes = [
     {
       "label": "Drainage",
       "value": "Drainage",
       "image": "assets/icons/drainage.png",
+      "requiresAI": true,
+    },
+    {
+      "label": "Manhole",
+      "value": "Manhole",
+      "image": "assets/icons/manhole.png",
+      "requiresAI": true,
     },
     {
       "label": "Potholes",
       "value": "Pothole",
       "image": "assets/icons/road_surface.png",
-    },
-    {
-      "label": "Waste Management",
-      "value": "Waste Management",
-      "image": "assets/icons/waste_management.png",
-    },
-    {
-      "label": "Road Blockage",
-      "value": "Road Blockage",
-      "image": "assets/icons/road_blockage.png",
+      "requiresAI": true,
     },
     {
       "label": "Road Markings",
       "value": "Road Markings",
       "image": "assets/icons/road_markings.png",
+      "requiresAI": true,
+    },
+    {
+      "label": "Waste Management",
+      "value": "Waste Management",
+      "image": "assets/icons/waste_management.png",
+      "requiresAI": false,
+    },
+    {
+      "label": "Road Blockage",
+      "value": "Road Blockage",
+      "image": "assets/icons/road_blockage.png",
+      "requiresAI": false,
     },
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text(
           "Select Issue Type",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFF122D5A),
+        backgroundColor: _navyColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -56,15 +69,15 @@ class IssueTypeSelectionPage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF122D5A),
+                color: _navyColor,
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               "Select the category that best describes the issue.",
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
           ),
           const SizedBox(height: 20),
@@ -76,15 +89,17 @@ class IssueTypeSelectionPage extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.85, // Adjust this to control card height
+                childAspectRatio: 0.80,
               ),
               itemBuilder: (context, index) {
                 final label = issueTypes[index]["label"];
                 final backendValue = issueTypes[index]["value"];
                 final imagePath = issueTypes[index]["image"];
+                final bool requiresAI = issueTypes[index]["requiresAI"];
 
                 return Card(
-                  elevation: 0, // Flat design looks cleaner with borders
+                  elevation: 0,
+                  color: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                     side: BorderSide(color: Colors.grey.shade200, width: 1.5),
@@ -95,8 +110,10 @@ class IssueTypeSelectionPage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              PhotoSelectionPage(issueType: backendValue),
+                          builder: (_) => PhotoSelectionPage(
+                            issueType: backendValue,
+                            requiresAI: requiresAI,
+                          ),
                         ),
                       );
                     },
@@ -104,24 +121,18 @@ class IssueTypeSelectionPage extends StatelessWidget {
                       padding: const EdgeInsets.all(12.0),
                       child: Column(
                         children: [
-                          // 🔹 LARGE IMAGE CONTAINER
                           Expanded(
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFF122D5A,
-                                ).withOpacity(0.03),
+                                color: _navyColor.withOpacity(0.03),
                                 borderRadius: BorderRadius.circular(15),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.all(
-                                  10.0,
-                                ), // Padding for the icon itself
+                                padding: const EdgeInsets.all(12.0),
                                 child: Image.asset(
                                   imagePath,
-                                  fit: BoxFit
-                                      .contain, // Keeps icons from stretching
+                                  fit: BoxFit.contain,
                                   errorBuilder: (context, error, stackTrace) =>
                                       const Icon(
                                         Icons.image_not_supported,
@@ -133,14 +144,15 @@ class IssueTypeSelectionPage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          // 🔹 LABEL
+
+                          //  LABEL
                           Text(
                             label,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: Color(0xFF122D5A),
+                              color: _navyColor,
                             ),
                           ),
                           const SizedBox(height: 4),

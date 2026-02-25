@@ -5,10 +5,13 @@ import 'location_page.dart';
 class PhotoCapturePage extends StatefulWidget {
   final File imageFile;
   final String issueType;
+  final bool requiresAI; // 🔹 Added flag to receive from PhotoSelectionPage
+
   const PhotoCapturePage({
     super.key,
     required this.imageFile,
     required this.issueType,
+    required this.requiresAI, // 🔹 Make it required
   });
 
   @override
@@ -25,6 +28,7 @@ class _PhotoCapturePageState extends State<PhotoCapturePage> {
         builder: (_) => LocationPage(
           imageFile: widget.imageFile,
           issueType: widget.issueType,
+          requiresAI: widget.requiresAI,
         ),
       ),
     );
@@ -32,10 +36,10 @@ class _PhotoCapturePageState extends State<PhotoCapturePage> {
 
   @override
   Widget build(BuildContext context) {
-    const navyColor = Color(0xFF122D5A);
+    const navyColor = Color(0xFF162447);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text(
           "Review Photo",

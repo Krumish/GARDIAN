@@ -52,7 +52,7 @@ class CustomDrawer extends StatelessWidget {
                       ),
                       child: const CircleAvatar(
                         radius: 36,
-                        backgroundColor: Colors.white24,
+                        backgroundColor: Colors.white,
                         backgroundImage: AssetImage(
                           "assets/icons/user_avatar.png",
                         ),
@@ -148,11 +148,11 @@ class CustomDrawer extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        leading: Icon(icon, color: isSelected ? Colors.green : Colors.white70),
+        leading: Icon(icon, color: isSelected ? Colors.green : Colors.white),
         title: Text(
           text,
           style: TextStyle(
-            color: isSelected ? Colors.green : Colors.white70,
+            color: isSelected ? Colors.green : Colors.white,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),

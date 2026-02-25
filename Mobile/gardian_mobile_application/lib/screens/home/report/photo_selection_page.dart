@@ -6,7 +6,13 @@ import 'photo_capture_page.dart';
 
 class PhotoSelectionPage extends StatefulWidget {
   final String issueType;
-  const PhotoSelectionPage({super.key, required this.issueType});
+  final bool requiresAI; // 🔹 Added flag to receive from IssueTypeSelectionPage
+
+  const PhotoSelectionPage({
+    super.key,
+    required this.issueType,
+    required this.requiresAI, // 🔹 Make it required
+  });
 
   @override
   State<PhotoSelectionPage> createState() => _PhotoSelectionPageState();
@@ -14,6 +20,9 @@ class PhotoSelectionPage extends StatefulWidget {
 
 class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
   final ImagePicker _picker = ImagePicker();
+  final Color _navyColor = const Color(
+    0xFF162447,
+  ); // 🔹 Updated to new global theme
 
   Future<File> _saveToDocuments(XFile xfile) async {
     final directory = await getApplicationDocumentsDirectory();
@@ -40,6 +49,8 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
           builder: (_) => PhotoCapturePage(
             imageFile: permanentFile,
             issueType: widget.issueType,
+            requiresAI:
+                widget.requiresAI, // 🔹 Pass the flag forward to the next page!
           ),
         ),
       );
@@ -48,10 +59,8 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    const navyColor = Color(0xFF122D5A);
-
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50, // 🔹 Softer background to match app
       appBar: AppBar(
         title: Text(
           "Report ${widget.issueType}",
@@ -60,7 +69,8 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: navyColor,
+        centerTitle: true,
+        backgroundColor: _navyColor,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
@@ -70,18 +80,24 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 32),
-            const Text(
+            Text(
               "Evidence is Key",
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
-                color: navyColor,
+                color: _navyColor,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+
+            // 🔹 Dynamic Text: Tells the user if AI is analyzing this or not
             Text(
-              "Please provide a clear photo of the ${widget.issueType.toLowerCase()} to help us assess the situation.",
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+              "Please provide a clear photo of the ${widget.issueType.toLowerCase()} to help us assess the situation. ${widget.requiresAI ? 'GARDIAN AI will analyze this image instantly.' : 'This report will be sent directly to MENRO for manual review.'}",
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 16,
+                height: 1.4,
+              ),
             ),
             const Spacer(),
 
@@ -101,7 +117,7 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
               title: "Upload from Gallery",
               subtitle: "Choose an existing photo from your device",
               icon: Icons.photo_library_rounded,
-              color: navyColor,
+              color: _navyColor,
               onTap: () => _handleImageSelection(ImageSource.gallery),
             ),
 
@@ -125,8 +141,8 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -145,7 +161,7 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(15),
@@ -159,10 +175,10 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF122D5A),
+                          color: _navyColor,
                         ),
                       ),
                       const SizedBox(height: 4),
