@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'analysis_loading_page.dart';
-import 'confirmation_page.dart';
 
 class LocationPage extends StatefulWidget {
   final File imageFile;
@@ -34,7 +33,8 @@ class _LocationPageState extends State<LocationPage> {
   Future<void> _initCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      await Geolocator.openLocationSettings();
+      // 🔹 FIX: Stop loading if service is disabled
+      if (mounted) setState(() => _loading = false);
       return;
     }
 
@@ -42,17 +42,25 @@ class _LocationPageState extends State<LocationPage> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission denied')),
-        );
+        if (mounted) {
+          setState(() => _loading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied')),
+          );
+        }
         return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location permission permanently denied')),
-      );
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission permanently denied'),
+          ),
+        );
+      }
       return;
     }
 
@@ -60,10 +68,12 @@ class _LocationPageState extends State<LocationPage> {
       desiredAccuracy: LocationAccuracy.high,
     );
 
-    setState(() {
-      _selectedCoordinate = LatLng(position.latitude, position.longitude);
-      _loading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _selectedCoordinate = LatLng(position.latitude, position.longitude);
+        _loading = false;
+      });
+    }
 
     _mapController?.animateCamera(
       CameraUpdate.newLatLngZoom(_selectedCoordinate!, 17),
@@ -75,8 +85,6 @@ class _LocationPageState extends State<LocationPage> {
 
     setState(() => _processing = true);
 
-    // ✅ REMOVED the "if Drainage" check.
-    // All issues (Pothole, Drainage, etc.) now go to the Analysis page.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -93,14 +101,44 @@ class _LocationPageState extends State<LocationPage> {
 
   @override
   Widget build(BuildContext context) {
+    const navyColor = Color(0xFF122D5A);
+
     return Scaffold(
-      appBar: AppBar(title: Text("Select Location - ${widget.issueType}")),
+      appBar: AppBar(
+        title: const Text(
+          "Pinpoint Location",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: navyColor,
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+      ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: navyColor),
+                  SizedBox(height: 16),
+                  Text(
+                    "Acquiring GPS Signal...",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            )
           : Stack(
               children: [
+                // 🔹 Full Screen Map
                 GoogleMap(
                   onMapCreated: (controller) => _mapController = controller,
+                  myLocationEnabled:
+                      true, // Shows the blue dot for the user's actual location
+                  myLocationButtonEnabled:
+                      false, // We will build a custom button later if needed
+                  compassEnabled: false,
+                  mapToolbarEnabled: false,
                   initialCameraPosition: CameraPosition(
                     target:
                         _selectedCoordinate ?? const LatLng(14.5995, 120.9842),
@@ -120,16 +158,82 @@ class _LocationPageState extends State<LocationPage> {
                       : {},
                   onTap: (pos) => setState(() => _selectedCoordinate = pos),
                 ),
+
+                // 🔹 Floating Instruction Card (Top)
                 Positioned(
-                  bottom: 20,
-                  left: 20,
-                  right: 20,
-                  child: ElevatedButton.icon(
-                    onPressed: _processing ? null : _processAndConfirm,
-                    icon: const Icon(Icons.cloud_upload_outlined),
-                    label: Text(_processing ? "Processing..." : "Continue"),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                  top: 16,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.touch_app_rounded,
+                          color: Colors.blueGrey.shade400,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            "Tap the map or drag the pin to adjust the exact location of the issue.",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 🔹 Action Button (Bottom)
+                Positioned(
+                  bottom: 32,
+                  left: 24,
+                  right: 24,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 55, // Consistent button height
+                    child: ElevatedButton.icon(
+                      onPressed: (_processing || _selectedCoordinate == null)
+                          ? null
+                          : _processAndConfirm,
+                      icon: _processing
+                          ? const SizedBox.shrink()
+                          : const Icon(Icons.analytics_outlined),
+                      label: _processing
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Analyze Issue",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green, // 🔹 Consistent Green
+                        foregroundColor: Colors.white,
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -25,17 +25,18 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   late String _currentStatus;
   bool _isWithdrawing = false;
 
+  final Color _navyColor = const Color(0xFF122D5A);
+
   @override
   void initState() {
     super.initState();
-    // Initialize the status from the passed data
     _currentStatus = widget.data['status'] ?? "Pending";
   }
 
   Color _blockageColor(double percent) {
-    if (percent >= 60) return Colors.red;
-    if (percent >= 25) return Colors.orange;
-    return Colors.green;
+    if (percent >= 60) return Colors.red.shade600;
+    if (percent >= 25) return Colors.orange.shade600;
+    return Colors.green.shade600;
   }
 
   String _blockageLabel(double percent) {
@@ -44,50 +45,77 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     return "Clear";
   }
 
-  // 🔹 Determine status color dynamically
+  // 🔹 Match status colors exactly with ReportHistory
   Color get _statusColor {
-    if (_currentStatus == "Resolved") return Colors.green;
-    if (_currentStatus == "Withdrawn") return Colors.grey;
-    return Colors.redAccent; // Pending
+    if (_currentStatus == "Resolved") return Colors.green.shade600;
+    if (_currentStatus == "Withdrawn") return Colors.grey.shade600;
+    return Colors.orange.shade600; // Pending
   }
 
-  // 🔹 Function to handle withdrawing the report
-  // 🔹 Function to handle withdrawing the report
+  IconData get _statusIcon {
+    if (_currentStatus == "Resolved") return Icons.check_circle_rounded;
+    if (_currentStatus == "Withdrawn") return Icons.cancel_rounded;
+    return Icons.access_time_filled_rounded; // Pending
+  }
+
   Future<void> _withdrawReport() async {
-    // 1. Show Confirmation Dialog
     bool confirm =
         await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text(
-              "Withdraw Report",
-              style: TextStyle(fontWeight: FontWeight.bold),
+            backgroundColor: Colors.white,
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.redAccent,
+                  size: 28,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  "Withdraw Report",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                ),
+              ],
             ),
-            content: const Text(
+            content: Text(
               "Are you sure you want to withdraw this report? This action cannot be undone.",
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
             ),
+            actionsPadding: const EdgeInsets.only(bottom: 16, right: 16),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text(
+                child: Text(
                   "Cancel",
-                  style: TextStyle(color: Colors.grey),
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
                   ),
                 ),
                 onPressed: () => Navigator.pop(context, true),
                 child: const Text(
                   "Withdraw",
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -97,14 +125,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
     if (!confirm) return;
 
-    // 2. Update Firebase
     setState(() => _isWithdrawing = true);
     try {
       final uid = authService.value.currentUser?.uid;
-
       if (uid == null) throw Exception("User not authenticated.");
 
-      //  Update the specific document in the user's 'uploads' subcollection
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
@@ -112,25 +137,55 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           .doc(widget.reportId)
           .update({'status': 'Withdrawn'});
 
-      // 3. Update local state
       setState(() {
         _currentStatus = 'Withdrawn';
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Report withdrawn successfully.")),
+          SnackBar(
+            content: const Text("Report withdrawn successfully."),
+            backgroundColor: Colors.grey.shade800,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error withdrawing report: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error withdrawing report: $e"),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } finally {
       setState(() => _isWithdrawing = false);
     }
+  }
+
+  // Helper function to build modern cards
+  Widget _buildCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: child,
+    );
   }
 
   @override
@@ -153,264 +208,398 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Report Details"), elevation: 0),
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: Text(
+          "Report Details",
+          style: TextStyle(
+            color: _navyColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: IconThemeData(color: _navyColor),
+        centerTitle: true,
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
           // --- 🖼 IMAGE WITH PINCH-TO-ZOOM ---
           if (normalUrl != null)
             Column(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: InteractiveViewer(
-                    panEnabled: true,
-                    minScale: 1.0,
-                    maxScale: 4.0,
-                    child: Image.network(
-                      _imageView.first == 'Annotated' && annotatedUrl != null
-                          ? annotatedUrl
-                          : normalUrl,
-                      height: 250,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: InteractiveViewer(
+                      panEnabled: true,
+                      minScale: 1.0,
+                      maxScale: 4.0,
+                      child: Image.network(
+                        _imageView.first == 'Annotated' && annotatedUrl != null
+                            ? annotatedUrl
+                            : normalUrl,
+                        height: 280,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 280,
+                            width: double.infinity,
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
+                // Segmented Button Toggle
                 if (annotatedUrl != null)
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: 'Normal',
-                        label: Text('Normal View'),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'Normal',
+                          label: Text('Normal View'),
+                          icon: Icon(Icons.photo_rounded),
+                        ),
+                        ButtonSegment(
+                          value: 'Annotated',
+                          label: Text('AI Annotated'),
+                          icon: Icon(Icons.analytics_rounded),
+                        ),
+                      ],
+                      selected: _imageView,
+                      onSelectionChanged: (Set<String> newSelection) {
+                        setState(() => _imageView = newSelection);
+                      },
+                      style: ButtonStyle(
+                        backgroundColor:
+                            MaterialStateProperty.resolveWith<Color>((
+                              Set<MaterialState> states,
+                            ) {
+                              if (states.contains(MaterialState.selected)) {
+                                return _navyColor.withOpacity(0.1);
+                              }
+                              return Colors.white;
+                            }),
+                        foregroundColor:
+                            MaterialStateProperty.resolveWith<Color>((
+                              Set<MaterialState> states,
+                            ) {
+                              if (states.contains(MaterialState.selected)) {
+                                return _navyColor;
+                              }
+                              return Colors.grey.shade600;
+                            }),
+                        side: MaterialStateProperty.all(
+                          BorderSide(color: Colors.grey.shade300),
+                        ),
                       ),
-                      ButtonSegment(
-                        value: 'Annotated',
-                        label: Text('AI Annotated'),
-                      ),
-                    ],
-                    selected: _imageView,
-                    onSelectionChanged: (Set<String> newSelection) {
-                      setState(() => _imageView = newSelection);
-                    },
+                    ),
                   ),
               ],
             ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // --- 📄 REPORT HEADER ---
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        issueType,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: _navyColor,
+                        ),
+                      ),
+                    ),
+                    // 🔹 Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _statusColor,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _statusColor.withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_statusIcon, color: Colors.white, size: 14),
+                          const SizedBox(width: 6),
+                          Text(
+                            _currentStatus,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Date Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.calendar_today_rounded,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      formattedDate,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Location Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.location_on_rounded,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        address,
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+          ),
+
+          const SizedBox(height: 16),
+
+          // --- 📊 BLOCKAGE PERCENTAGE CARD (AI UI) ---
+          if (issueType == "Drainage" && blockagePercent != null) ...[
+            _buildCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      Icon(
+                        Icons.analytics_rounded,
+                        color: _navyColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        issueType,
-                        style: const TextStyle(
-                          fontSize: 20,
+                        "AI Blockage Assessment",
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      // 🔹 Status Badge (Now uses local _currentStatus)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _statusColor),
-                        ),
-                        child: Text(
-                          _currentStatus,
-                          style: TextStyle(
-                            color: _statusColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          fontSize: 16,
+                          color: _navyColor,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        formattedDate,
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          address,
-                          style: const TextStyle(color: Colors.black87),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // --- 📊 BLOCKAGE PERCENTAGE CARD ---
-          if (issueType == "Drainage" && blockagePercent != null)
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Drainage Blockage Assessment",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(5),
-                            child: LinearProgressIndicator(
-                              value: blockagePercent / 100,
-                              minHeight: 12,
-                              backgroundColor: Colors.grey.shade300,
-                              color: _blockageColor(blockagePercent),
+                        child: Stack(
+                          children: [
+                            Container(
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                          ),
+                            FractionallySizedBox(
+                              widthFactor: blockagePercent / 100,
+                              child: Container(
+                                height: 14,
+                                decoration: BoxDecoration(
+                                  color: _blockageColor(blockagePercent),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Text(
+                      ),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        width: 50,
+                        child: Text(
                           "${blockagePercent.toStringAsFixed(1)}%",
+                          textAlign: TextAlign.right,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                             color: _blockageColor(blockagePercent),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _blockageLabel(blockagePercent),
-                      style: TextStyle(
-                        color: _blockageColor(blockagePercent),
-                        fontWeight: FontWeight.bold,
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Status: ${_blockageLabel(blockagePercent)}",
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-
-          const SizedBox(height: 12),
+            const SizedBox(height: 16),
+          ],
 
           // --- 📝 NOTES ---
-          if (note.toString().trim().isNotEmpty)
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.notes, size: 20, color: Colors.grey),
-                        SizedBox(width: 8),
-                        Text(
-                          "Additional Notes",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+          if (note.toString().trim().isNotEmpty) ...[
+            _buildCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.notes_rounded, size: 20, color: _navyColor),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Additional Notes",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: _navyColor,
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    note,
+                    style: TextStyle(
+                      height: 1.6,
+                      color: Colors.grey.shade800,
+                      fontSize: 14,
                     ),
-                    const SizedBox(height: 8),
-                    Text(note, style: const TextStyle(height: 1.5)),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-
-          const SizedBox(height: 12),
+            const SizedBox(height: 16),
+          ],
 
           // --- 🗺️ MAP ---
-          if (lat != null && lng != null)
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          if (lat != null && lng != null) ...[
+            Container(
+              height: 220,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  height: 200,
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(lat, lng),
-                      zoom: 16,
-                    ),
-                    markers: {
-                      Marker(
-                        markerId: MarkerId(widget.reportId),
-                        position: LatLng(lat, lng),
-                      ),
-                    },
-                    zoomControlsEnabled: false,
-                    mapToolbarEnabled: false,
-                    myLocationEnabled: false,
+                borderRadius: BorderRadius.circular(20),
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: LatLng(lat, lng),
+                    zoom: 16,
                   ),
+                  markers: {
+                    Marker(
+                      markerId: MarkerId(widget.reportId),
+                      position: LatLng(lat, lng),
+                    ),
+                  },
+                  zoomControlsEnabled: false,
+                  mapToolbarEnabled: false,
+                  myLocationEnabled: false,
+                  scrollGesturesEnabled:
+                      false, // 🔹 Disable scrolling so it doesn't mess with ListView
                 ),
               ),
             ),
-
-          const SizedBox(height: 24),
+            const SizedBox(height: 30),
+          ],
 
           // --- ❌ WITHDRAW BUTTON ---
-          // Only show this button if the report is still "Pending"
           if (_currentStatus == "Pending")
             SizedBox(
               width: double.infinity,
               height: 55,
-              child: OutlinedButton.icon(
+              child: ElevatedButton.icon(
                 onPressed: _isWithdrawing ? null : _withdrawReport,
                 icon: _isWithdrawing
                     ? const SizedBox(
@@ -418,25 +607,26 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.redAccent,
+                          color: Colors.white,
                         ),
                       )
                     : const Icon(
-                        Icons.cancel_outlined,
-                        color: Colors.redAccent,
+                        Icons.delete_outline_rounded,
+                        color: Colors.white,
                       ),
                 label: Text(
                   _isWithdrawing ? "Withdrawing..." : "Withdraw Report",
                   style: const TextStyle(
-                    color: Colors.redAccent,
+                    color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.redAccent),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),

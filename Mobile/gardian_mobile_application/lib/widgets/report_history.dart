@@ -4,8 +4,9 @@ import 'package:gardian_mobile_application/widgets/report_detail_page.dart';
 import '../services/auth_services.dart';
 import '../services/storage_service.dart';
 
+const Color _navyColor = Color(0xFF162447); // 🔹 Lifted out for easier access
+
 class ReportHistory extends StatelessWidget {
-  // 🔹 1. Changed from String to Set<String> to support multiple selections
   final Set<String> selectedFilters;
 
   const ReportHistory({super.key, required this.selectedFilters});
@@ -14,216 +15,312 @@ class ReportHistory extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = authService.value.currentUser?.uid;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            "Report History",
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+    return StreamBuilder<QuerySnapshot>(
+      stream: storageService.getUserUploadsStream(uid!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: _navyColor),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState(
+            "No reports found",
+            Icons.folder_open_rounded,
+          );
+        }
+
+        // 🔹 SMART FILTERING LOGIC
+        final uploads = snapshot.data!.docs.where((doc) {
+          if (selectedFilters.isEmpty || selectedFilters.contains("All"))
+            return true;
+
+          final data = doc.data() as Map<String, dynamic>;
+          final status = data['status'] ?? "Pending";
+          final issueType = data['issueType'] ?? "Unknown";
+
+          final activeTypes = selectedFilters.intersection({
+            "Drainage",
+            "Pothole",
+          });
+          final activeStatuses = selectedFilters.intersection({
+            "Pending",
+            "Resolved",
+            "Withdrawn",
+          });
+
+          final matchType =
+              activeTypes.isEmpty || activeTypes.contains(issueType);
+          final matchStatus =
+              activeStatuses.isEmpty || activeStatuses.contains(status);
+
+          return matchType && matchStatus;
+        }).toList();
+
+        if (uploads.isEmpty) {
+          return _buildEmptyState(
+            "No reports match your filters",
+            Icons.search_off_rounded,
+          );
+        }
+
+        return ListView.builder(
+          itemCount: uploads.length,
+          padding: const EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 10,
+            bottom: 120,
           ),
-        ),
-
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: storageService.getUserUploadsStream(uid!),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return _buildEmptyState("No reports yet", Icons.folder_open);
-              }
-
-              // 🔹 2. Updated multi-filter logic
-              final allUploads = snapshot.data!.docs;
-              final uploads = allUploads.where((doc) {
-                // If nothing is selected, or "All" is selected, show everything
-                if (selectedFilters.isEmpty ||
-                    selectedFilters.contains("All")) {
-                  return true;
-                }
-
-                final data = doc.data() as Map<String, dynamic>;
-                final status = data['status'] ?? "Pending";
-                final issueType = data['issueType'] ?? "Unknown";
-
-                // Show the document if its status OR its issueType is in the selected filters
-                return selectedFilters.contains(status) ||
-                    selectedFilters.contains(issueType);
-              }).toList();
-
-              // 🔹 3. Show empty state if the filter results in 0 items
-              if (uploads.isEmpty) {
-                return _buildEmptyState(
-                  "No reports match the selected filters",
-                  Icons.search_off,
-                );
-              }
-
-              return ListView.builder(
-                itemCount: uploads.length,
-                padding: const EdgeInsets.all(12),
-                itemBuilder: (context, index) {
-                  final data = uploads[index].data() as Map<String, dynamic>;
-                  final url = data['url'] ?? data['url'] as String?;
-                  final reportId = uploads[index].id;
-                  final status = data['status'] ?? "Pending";
-                  final issueType = data['issueType'] ?? "Unknown";
-                  final address = data['address'] ?? "";
-
-                  final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
-                  final obstructions =
-                      (yolo['obstructions'] as List?)?.length ?? 0;
-
-                  // 🔹 4. Added Explicit "Withdrawn" Color
-                  Color statusColor;
-                  switch (status) {
-                    case "Pending":
-                      statusColor = Colors.redAccent;
-                      break;
-                    case "Resolved":
-                      statusColor = Colors.green;
-                      break;
-                    case "Withdrawn":
-                      statusColor =
-                          Colors.blueGrey; // Added distinct color for Withdrawn
-                      break;
-                    default:
-                      statusColor = Colors.grey;
-                  }
-
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ReportDetailPage(reportId: reportId, data: data),
-                        ),
-                      );
-                    },
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (url != null)
-                            ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12),
-                              ),
-                              child: Image.network(
-                                url,
-                                height: 150,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // STATUS LABEL
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: statusColor,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    status,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 8),
-
-                                Text(
-                                  issueType,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 6),
-
-                                // DRAINAGE YOLO ONLY
-                                if (issueType == "Drainage")
-                                  Text(
-                                    "Detected: $obstructions Obstruction(s)",
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-
-                                if (issueType != "Drainage")
-                                  const Text(
-                                    " ",
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-
-                                if (address.isNotEmpty)
-                                  Text(
-                                    address,
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-
-                                const SizedBox(height: 6),
-
-                                Text(
-                                  "#$reportId",
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
+          itemBuilder: (context, index) {
+            final data = uploads[index].data() as Map<String, dynamic>;
+            return _ReportCard(reportId: uploads[index].id, data: data);
+          },
+        );
+      },
     );
   }
 
-  // Helper widget for a cleaner empty state
   Widget _buildEmptyState(String message, IconData icon) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 60, color: Colors.grey.shade400),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 48, color: Colors.grey.shade400),
+          ),
           const SizedBox(height: 16),
           Text(
             message,
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade500,
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// 🔹 EXTRACTED WIDGET: Makes your main file 100x easier to read.
+class _ReportCard extends StatelessWidget {
+  final String reportId;
+  final Map<String, dynamic> data;
+
+  const _ReportCard({required this.reportId, required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = data['url'] as String?;
+    final status = data['status'] ?? "Pending";
+    final issueType = data['issueType'] ?? "Unknown";
+    final address = data['address'] ?? "No address provided";
+    final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
+    final obstructions = (yolo['obstructions'] as List?)?.length ?? 0;
+
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (status) {
+      case "Pending":
+        statusColor = Colors.orange.shade600;
+        statusIcon = Icons.access_time_filled_rounded;
+        break;
+      case "Resolved":
+        statusColor = Colors.green.shade600;
+        statusIcon = Icons.check_circle_rounded;
+        break;
+      case "Withdrawn":
+        statusColor = Colors.grey.shade600;
+        statusIcon = Icons.cancel_rounded;
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.info_rounded;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReportDetailPage(reportId: reportId, data: data),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (url != null)
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                    child: Image.network(
+                      url,
+                      height: 160,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          height: 160,
+                          width: double.infinity,
+                          color: Colors.grey.shade100,
+                          child: const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, color: Colors.white, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            status,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        issueType,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: _navyColor,
+                        ),
+                      ),
+                      Text(
+                        "#${reportId.substring(0, 6).toUpperCase()}",
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        color: Colors.grey.shade400,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (issueType == "Drainage" && obstructions > 0) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _navyColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _navyColor.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.analytics_rounded,
+                            color: _navyColor,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            "AI Detected: $obstructions Obstruction(s)",
+                            style: const TextStyle(
+                              color: _navyColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -24,32 +24,24 @@ class NotificationIconButton extends StatelessWidget {
           .doc(uid)
           .collection("notifications")
           .where("read", isEqualTo: false)
+          .limit(1)
           .snapshots(),
       builder: (context, snapshot) {
-        final unreadCount = snapshot.data?.docs.length ?? 0;
+        final hasUnread = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
 
-        return Stack(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.notifications_none, color: Colors.white),
-              onPressed: onPressed,
-            ),
-
-            // 🔴 RED DOT
-            if (unreadCount > 0)
-              Positioned(
-                right: 10,
-                top: 10,
-                child: Container(
-                  width: 10,
-                  height: 10,
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-          ],
+        // Modern Flutter way to do notification dots
+        return Badge(
+          isLabelVisible: hasUnread,
+          smallSize: 10,
+          backgroundColor: Colors.red,
+          alignment: const Alignment(
+            0.4,
+            -0.4,
+          ), // Adjusts dot position over the icon
+          child: IconButton(
+            icon: const Icon(Icons.notifications_none, color: Colors.white),
+            onPressed: onPressed,
+          ),
         );
       },
     );

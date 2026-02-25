@@ -3,6 +3,7 @@ import 'package:gardian_mobile_application/screens/auth/login_page.dart';
 import '../../services/auth_services.dart';
 import 'otp_page.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/custom_button.dart'; // 🔹 Added this import
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -34,11 +35,28 @@ class _RegisterPageState extends State<RegisterPage> {
   ];
 
   void _sendOtp() async {
-    // 🔹 Simple validation for the dropdown
+    // 🔹 Added validation for all fields
+    if (_firstNameController.text.trim().isEmpty ||
+        _lastNameController.text.trim().isEmpty ||
+        _emailController.text.trim().isEmpty ||
+        _phoneController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill in all fields"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     if (_selectedBarangay == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Please select a Barangay")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select a Barangay"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
       return;
     }
 
@@ -47,7 +65,7 @@ class _RegisterPageState extends State<RegisterPage> {
     await authService.value.sendOtp(
       phoneNumber: _phoneController.text.trim(),
       codeSent: (verificationId) {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
 
         Navigator.push(
           context,
@@ -58,17 +76,22 @@ class _RegisterPageState extends State<RegisterPage> {
               password: _passwordController.text.trim(),
               firstName: _firstNameController.text.trim(),
               lastName: _lastNameController.text.trim(),
-              barangay: _selectedBarangay!, // 🔹 Pass the selected value
+              barangay: _selectedBarangay!, // Pass the selected value
               phone: _phoneController.text.trim(),
             ),
           ),
         );
       },
       onError: (error) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error: $error")));
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error: $error"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       },
     );
   }
@@ -80,10 +103,18 @@ class _RegisterPageState extends State<RegisterPage> {
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 30),
-            Image.asset("assets/icons/GARDIAN.png", height: 160),
-            const SizedBox(height: 20),
+            // 🔹 Logo Section (Matches Login Page structure)
             Expanded(
+              flex: 2,
+              child: Center(
+                // Slightly smaller logo here to accommodate more form fields
+                child: Image.asset("assets/icons/GARDIAN.png", height: 180),
+              ),
+            ),
+
+            // 🔹 Form Section
+            Expanded(
+              flex: 5, // Gives more room for the longer registration form
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -101,7 +132,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       const Text(
                         "Sign up",
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 22, // 🔹 Matched login header size
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -129,54 +160,45 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: 12),
 
+                      // Barangay Dropdown
                       DropdownButtonFormField<String>(
                         value: _selectedBarangay,
-                        // 🔹 Use the same hint style as your CustomTextField
                         hint: const Text(
                           "Select Barangay",
                           style: TextStyle(color: Colors.black87, fontSize: 16),
                         ),
-
                         dropdownColor: Colors.white,
                         icon: const Icon(
                           Icons.arrow_drop_down,
                           color: Colors.grey,
                         ),
-
                         decoration: InputDecoration(
                           filled: true,
-                          fillColor: Colors.grey[100], // Match fillColor
+                          fillColor: Colors.grey[100],
                           contentPadding: const EdgeInsets.symmetric(
                             vertical: 18,
                             horizontal: 16,
                           ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              14,
-                            ), // Match border radius
+                            borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide.none,
                           ),
-                          // Optional: Add a subtle border like a TextField when focused
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide.none,
                           ),
                         ),
-
-                        // 🔹 Standard Text style for the selected item
                         style: const TextStyle(
                           fontSize: 16,
                           color: Colors.black87,
-                          fontFamily: 'Roboto', // Or your app's font
+                          fontFamily: 'Roboto',
                         ),
-
                         items: _caintaBarangays.map((String barangay) {
                           return DropdownMenuItem<String>(
                             value: barangay,
                             child: Text(barangay),
                           );
                         }).toList(),
-
                         onChanged: (String? newValue) {
                           setState(() {
                             _selectedBarangay = newValue;
@@ -198,30 +220,14 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
 
                       const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _sendOtp,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                )
-                              : const Text(
-                                  "Register",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                        ),
+
+                      // 🔹 Unified CustomButton usage
+                      CustomButton(
+                        text: "Register",
+                        isLoading: _isLoading,
+                        onPressed: _sendOtp,
                       ),
+
                       const SizedBox(height: 12),
                       Center(
                         child: Row(
@@ -233,7 +239,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                             TextButton(
                               onPressed: () {
-                                Navigator.push(
+                                Navigator.pushReplacement(
+                                  // 🔹 Use replacement to prevent stacking too many pages
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => const LoginPage(),

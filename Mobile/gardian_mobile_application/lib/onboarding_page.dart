@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -15,25 +14,26 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _controller = PageController();
   int current = 0;
+  bool _isLoading = false; // 🔹 Added loading state
 
   final pages = [
-    _Page(
+    const _Page(
       title: "Detect & Report",
       text: "GARDIAN helps detect, assess, and report community issues easily.",
       image: "assets/icons/1.png",
     ),
-    _Page(
+    const _Page(
       title: "Smart Analysis",
       text:
           "Upload a photo — drainage, roads, or waste are analyzed instantly.",
       image: "assets/icons/2.png",
     ),
-    _Page(
+    const _Page(
       title: "Insights",
       text: "Get summaries, issue details, and mapped locations.",
       image: "assets/icons/3.png",
     ),
-    _Page(
+    const _Page(
       title: "Help Communities",
       text:
           "Submit reports and help create safer and more sustainable communities.",
@@ -42,23 +42,64 @@ class _OnboardingPageState extends State<OnboardingPage> {
   ];
 
   Future<void> _finishOnboarding() async {
-    final user = FirebaseAuth.instance.currentUser;
+    setState(() => _isLoading = true);
 
-    if (user == null) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
 
-    await FirebaseFirestore.instance.collection("users").doc(user.uid).set({
-      "seen_onboarding": true,
-    }, SetOptions(merge: true));
+      if (user != null) {
+        await FirebaseFirestore.instance.collection("users").doc(user.uid).set({
+          "seen_onboarding": true,
+        }, SetOptions(merge: true));
+      }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MainWrapper()),
-    );
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainWrapper()),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Something went wrong. Please try again."),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+      // 🔹 Added an AppBar just for the Skip button
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          if (current != pages.length - 1)
+            TextButton(
+              onPressed: () {
+                _controller.animateToPage(
+                  pages.length - 1,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeInOut,
+                );
+              },
+              child: const Text(
+                "Skip",
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -71,6 +112,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
 
+            // 🔹 Dot Indicators
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -81,17 +123,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   height: 10,
                   width: current == i ? 24 : 10,
                   decoration: BoxDecoration(
-                    color: current == i ? Color(0xFF122D5A) : Colors.grey[300],
+                    color: current == i
+                        ? const Color(0xFF162447)
+                        : Colors.grey[300], // 🔹 Updated color
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
 
+            // 🔹 Next / Get Started Button
             SizedBox(
-              width: 150,
+              width:
+                  160, // Slightly wider to accommodate loading spinner safely
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
@@ -100,20 +146,37 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: current == pages.length - 1
-                    ? _finishOnboarding
-                    : () => _controller.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
+                onPressed: _isLoading
+                    ? null
+                    : (current == pages.length - 1
+                          ? _finishOnboarding
+                          : () => _controller.nextPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            )),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        current == pages.length - 1 ? "Get Started" : "Next",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                child: Text(
-                  current == pages.length - 1 ? "Get Started" : "Next",
-                  style: TextStyle(color: Colors.white),
-                ),
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 32,
+            ), // Added a bit more padding at the bottom
           ],
         ),
       ),
@@ -135,18 +198,28 @@ class _Page extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset(image, height: 220),
-          const SizedBox(height: 30),
+          Image.asset(
+            image,
+            height: 260,
+          ), // Scaled up slightly to fill space better
+          const SizedBox(height: 40),
           Text(
             title,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF162447),
+            ), // Themed text
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54),
+            style: const TextStyle(color: Colors.black54, fontSize: 16),
           ),
+          const SizedBox(
+            height: 40,
+          ), // Pushes content up slightly to balance the screen
         ],
       ),
     );

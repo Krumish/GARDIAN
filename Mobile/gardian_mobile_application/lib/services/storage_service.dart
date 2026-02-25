@@ -85,14 +85,20 @@ class StorageService {
           // 🔍 Full YOLO payload
           "yolo": cleanYolo,
 
-          // 🔢 Promoted Metrics (Safe-checks for missing keys)
+          
           "blockagePercent": cleanYolo["blockage_percent"] ?? 0,
           "blockageRatio": cleanYolo["max_blockage_ratio"] ?? 0,
-          "drainageCount": cleanYolo["drainage_count"] ?? 0,
-          "obstructionCount": cleanYolo["obstruction_count"] ?? 0,
+          "drainageCount":
+              cleanYolo["drainage_count"] ??
+              (cleanYolo["drainage"] as List?)?.length ??
+              0,
+          "obstructionCount":
+              cleanYolo["obstruction_count"] ??
+              (cleanYolo["obstructions"] as List?)?.length ??
+              0,
           "yoloStatus": cleanYolo["status"] ?? "No detections",
 
-          // 📍 Metadata
+          // Metadata
           "latitude": lat,
           "longitude": lng,
           "address": address,
@@ -110,8 +116,8 @@ class StorageService {
     final sanitized = Map<String, dynamic>.from(results);
 
     // REMOVE non-storable objects
-    sanitized.remove("annotated_image"); // The large Base64 string
-    sanitized.remove("annotatedFile"); // The File object
+    sanitized.remove("annotated_image"); 
+    sanitized.remove("annotatedFile"); 
 
     sanitized.updateAll((key, value) {
       if (value is int ||

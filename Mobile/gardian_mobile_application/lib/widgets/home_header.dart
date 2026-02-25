@@ -8,34 +8,66 @@ class HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = authService.value.currentUser;
     final displayName = user?.displayName ?? "User";
+    const navyColor = Color(0xFF122D5A);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 30, bottom: 30, left: 20, right: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Profile + Greeting
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 28,
-                backgroundImage: AssetImage("assets/icons/user_avatar.png"),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Welcome Back, $displayName!",
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+          // 🔹 Greeting & Name
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Good Day,",
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
-                  const Text("Good Day", style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    color: navyColor,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+
+          // 🔹 Avatar Profile
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: navyColor.withOpacity(0.2), width: 2),
+            ),
+            child: const CircleAvatar(
+              radius: 26,
+              backgroundImage: AssetImage("assets/icons/user_avatar.png"),
+              backgroundColor:
+                  Colors.transparent, // Prevents white box on transparent PNGs
+            ),
           ),
         ],
       ),

@@ -11,108 +11,172 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // 🔹 1. Change from String to Set<String> to track multiple selected filters
   Set<String> _activeFilters = {"All"};
 
-  // 🔹 2. Added "Withdrawn" to the list
-  final List<String> _filters = [
-    "All",
-    "Drainage",
-    "Pothole",
-    "Pending",
-    "Resolved",
-    "Withdrawn",
-  ];
+  // 🔹 Separated the filters into logical groups
+  final List<String> _typeFilters = ["All", "Drainage", "Pothole"];
+  final List<String> _statusFilters = ["Pending", "Resolved", "Withdrawn"];
+
+  // 🔹 Unified the app theme color
+  final Color navyColor = const Color(0xFF162447);
+
+  void _toggleFilter(String filter) {
+    setState(() {
+      if (filter == 'All') {
+        _activeFilters = {'All'};
+      } else {
+        _activeFilters.remove('All');
+
+        if (_activeFilters.contains(filter)) {
+          _activeFilters.remove(filter);
+        } else {
+          _activeFilters.add(filter);
+        }
+
+        // If user unchecks everything, default back to 'All'
+        if (_activeFilters.isEmpty) {
+          _activeFilters.add('All');
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.grey.shade50,
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const HomeHeader(),
 
-          // 🔹 FILTER SECTION
-          Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              itemCount: _filters.length,
-              itemBuilder: (context, index) {
-                final filter = _filters[index];
+          const SizedBox(height: 16),
 
-                // 🔹 3. Check if the Set contains this filter
-                bool isSelected = _activeFilters.contains(filter);
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: FilterChip(
-                    label: Text(filter),
-                    selected: isSelected,
-                    onSelected: (bool selected) {
-                      setState(() {
-                        // 🔹 4. Logic for multiple selections
-                        if (filter == 'All') {
-                          // If they tap 'All', clear everything else
-                          _activeFilters = {'All'};
-                        } else {
-                          // Remove 'All' if they select a specific filter
-                          _activeFilters.remove('All');
-
-                          if (selected) {
-                            _activeFilters.add(filter); // Add the new filter
-                          } else {
-                            _activeFilters.remove(filter); // Remove the filter
-
-                            // If they unselect everything, default back to 'All'
-                            if (_activeFilters.isEmpty) {
-                              _activeFilters.add('All');
-                            }
-                          }
-                        }
-                      });
-                    },
-                    selectedColor: const Color(0xFF122D5A),
-                    checkmarkColor: Colors.white,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black87,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                    backgroundColor: Colors.grey[200],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                );
-              },
+          // 🔹 Section Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              "My Reports",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: navyColor,
+              ),
             ),
           ),
 
-          // 🔹 5. Pass the Set of filters to the ReportHistory widget
-          // Note: Make sure ReportHistory is expecting 'selectedFilters' (plural) as defined in the previous step
+          const SizedBox(height: 12),
+
+          // 🔹 FILTER SECTION 1: Issue Type
+          _buildFilterRow("Issue Type", _typeFilters),
+
+          const SizedBox(height: 8),
+
+          // 🔹 FILTER SECTION 2: Status
+          _buildFilterRow("Status", _statusFilters),
+
+          const SizedBox(height: 12),
+
+          // 🔹 REPORT LIST
           Expanded(child: ReportHistory(selectedFilters: _activeFilters)),
         ],
       ),
 
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const IssueTypeSelectionPage()),
-          );
-        },
-        backgroundColor: Colors.green,
-        label: const Text(
-          "Report an Issue",
-          style: TextStyle(fontSize: 20, color: Colors.white),
+      // 🔹 FLOATING ACTION BUTTON
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        extendedPadding: const EdgeInsets.symmetric(horizontal: 90.0),
+        child: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IssueTypeSelectionPage()),
+            );
+          },
+          backgroundColor: Colors.green,
+          elevation: 0,
+          icon: const Icon(Icons.add_a_photo_rounded, color: Colors.white),
+          label: const Text(
+            "Report an Issue",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          extendedPadding: const EdgeInsets.symmetric(horizontal: 32.0),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  // 🔹 Helper Widget for clean, reusable filter rows
+  Widget _buildFilterRow(String title, List<String> filters) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 36, // Sleek height
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: filters.length,
+            itemBuilder: (context, index) {
+              final filter = filters[index];
+              bool isSelected = _activeFilters.contains(filter);
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: FilterChip(
+                  label: Text(filter),
+                  selected: isSelected,
+                  onSelected: (_) => _toggleFilter(filter),
+                  selectedColor: navyColor,
+                  checkmarkColor: Colors.white,
+                  showCheckmark: false,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.grey.shade700,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                  backgroundColor: Colors.white,
+                  side: BorderSide(
+                    color: isSelected ? navyColor : Colors.grey.shade300,
+                    width: 1,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

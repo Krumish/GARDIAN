@@ -32,7 +32,6 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
   Future<void> _runAnalysis() async {
     try {
-      // 1️⃣ CALL BACKEND: Pass the issueType so FastAPI selects the right model
       final results = await YoloService.detect(
         widget.imageFile,
         widget.issueType,
@@ -44,35 +43,31 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
         return _triggerError("Server Error: ${results["error"]}");
       }
 
-      // 2️⃣ GENERAL DETECTION CHECK
-      // In our updated Python code, every model returns a 'boxes' list
       final allBoxes = results["boxes"] as List? ?? [];
 
       if (allBoxes.isEmpty) {
         return _triggerError(
-          "No ${widget.issueType} anomalies detected.\nPlease upload a clearer image.",
+          "No ${widget.issueType.toLowerCase()} anomalies detected.\nPlease upload a clearer image or try a different angle.",
         );
       }
 
-      // 3️⃣ PREPARE SUMMARY (Works for both Drainage and Pothole)
       final yoloSummary = {
         "status": results["status"],
-        "boxes": allBoxes, // Save all raw detections
-        // Drainage-specific metrics (will be null for Potholes)
+        "boxes": allBoxes,
         "blockage_percent": results["blockage_percent"],
         "max_blockage_ratio": results["max_blockage_ratio"],
         "drainage": results["drainage"],
         "obstructions": results["obstructions"],
-
         "annotated_image": results["annotated_image"],
-        "annotatedFile":
-            results["annotatedFile"], // The file we created in YoloService
+        "annotatedFile": results["annotatedFile"],
       };
 
       _goToConfirmation(yoloSummary);
     } catch (e) {
       if (!mounted) return;
-      _triggerError("Failed to reach the analysis server.");
+      _triggerError(
+        "Failed to reach the analysis server. Please check your connection.",
+      );
     }
   }
 
@@ -99,41 +94,108 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
 
   @override
   Widget build(BuildContext context) {
+    const navyColor = Color(0xFF122D5A);
+
     if (_isError) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Analysis Failed")),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text(
+            "Analysis Failed",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          backgroundColor: navyColor,
+          iconTheme: const IconThemeData(color: Colors.white),
+          elevation: 0,
+        ),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 60),
-                const SizedBox(height: 16),
-                Text(
-                  _errorMessage ?? "Something went wrong.",
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
+                // 🔹 Error Icon Container
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.red,
+                    size: 64,
+                  ),
                 ),
                 const SizedBox(height: 24),
-
-                // Retry button
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _isError = false;
-                    });
-                    _runAnalysis();
-                  },
-                  child: const Text("Retry"),
+                const Text(
+                  "Unable to Process",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: navyColor,
+                  ),
                 ),
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage ?? "Something went wrong during analysis.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 40),
 
-                const SizedBox(height: 8),
-
-                // Go Back button
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Go Back"),
+                // 🔹 Action Buttons
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() => _isError = false);
+                      _runAnalysis();
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text(
+                      "Try Again",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: navyColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey.shade700,
+                      side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    child: const Text(
+                      "Go Back",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -142,14 +204,46 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
       );
     }
 
-    return const Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text("Analyzing drainage image..."),
+            // 🔹 Custom Loading Animation Layout
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: CircularProgressIndicator(
+                    color: navyColor,
+                    strokeWidth: 6,
+                    backgroundColor: navyColor.withOpacity(0.1),
+                  ),
+                ),
+                Icon(
+                  Icons.document_scanner_outlined,
+                  color: navyColor,
+                  size: 40,
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            Text(
+              "Analyzing ${widget.issueType}...",
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: navyColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Applying GARDIAN AI models",
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            ),
           ],
         ),
       ),

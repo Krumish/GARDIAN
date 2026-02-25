@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/auth_services.dart';
 
 class CustomDrawer extends StatelessWidget {
-  // 🔹 New: These allow the drawer to communicate with the MainWrapper
   final int selectedIndex;
   final Function(int) onItemTapped;
 
@@ -18,97 +17,153 @@ class CustomDrawer extends StatelessWidget {
 
     return Drawer(
       child: Container(
-        color: const Color(0xFF122D5A),
-        child: ListView(
-          padding: EdgeInsets.zero,
+        // 🔹 Unified the dark blue color to match your Auth pages
+        color: const Color(0xFF162447),
+        child: Column(
           children: [
-            UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(color: Color(0xFF122D5A)),
-              currentAccountPicture: GestureDetector(
-                onTap: () {
-                  Navigator.pop(context); // Close drawer
-                  onItemTapped(4); // Index 4 is Profile
-                },
-                child: const CircleAvatar(
-                  backgroundColor: Colors.white24,
-                  backgroundImage: AssetImage("assets/icons/user_avatar.png"),
-                ),
+            // 🔹 Custom, modern Header instead of the default UserAccountsDrawerHeader
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(
+                top: 60,
+                bottom: 20,
+                left: 24,
+                right: 24,
               ),
-              accountName: Text(
-                user?.displayName ?? "GARDIAN User",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.1), // Subtle contrast
               ),
-              accountEmail: Text(
-                user?.email ?? "Online",
-                style: const TextStyle(color: Colors.greenAccent),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context); // Close drawer
+                      onItemTapped(4); // Index 4 is Profile
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.green,
+                          width: 2,
+                        ), // Nice accent ring
+                      ),
+                      child: const CircleAvatar(
+                        radius: 36,
+                        backgroundColor: Colors.white24,
+                        backgroundImage: AssetImage(
+                          "assets/icons/user_avatar.png",
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    user?.displayName ?? "GARDIAN User",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    user?.email ?? "Online",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            // 🏠 Home
-            _drawerItem(Icons.home, "Home", 0),
+            const SizedBox(height: 12),
 
-            // 👤 Profile
-            _drawerItem(Icons.person, "Profile", 4),
+            // 🔹 Scrollable Menu Items
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _drawerItem(context, Icons.home, "Home", 0),
+                  _drawerItem(context, Icons.person, "Profile", 4),
+                  _drawerItem(context, Icons.feedback, "Send Feedback", 1),
+                  _drawerItem(context, Icons.call, "Contact Us", 2),
+                  _drawerItem(context, Icons.info_outline, "About", 3),
+                ],
+              ),
+            ),
 
-            // 💬 Feedback
-            _drawerItem(Icons.feedback, "Send Feedback", 1),
-
-            // 📞 Contact
-            _drawerItem(Icons.call, "Contact Us", 2),
-
-            // ℹ️ About
-            _drawerItem(Icons.info_outline, "About", 3),
-
-            const Divider(color: Colors.white54, indent: 20, endIndent: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Divider(color: Colors.white24, height: 1),
+            ),
 
             // 🚪 Log Out
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.white),
-              title: const Text(
-                "Log Out",
-                style: TextStyle(color: Colors.white),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                leading: const Icon(Icons.logout, color: Colors.redAccent),
+                title: const Text(
+                  "Log Out",
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onTap: () async {
+                  // 1. Close the drawer first so the app feels instantly responsive
+                  Navigator.pop(context);
+
+                  // 2. Perform sign out.
+                  // 🔹 FIX: Removed the popUntil. The AuthWrapper will naturally detect
+                  // the auth state change and rebuild the app to show the Login Page.
+                  await authService.value.signOut();
+                },
               ),
-              onTap: () async {
-                Navigator.pop(context);
-
-                Navigator.of(context).popUntil((route) => route.isFirst);
-
-                await authService.value.signOut();
-              },
             ),
+            const SizedBox(height: 12), // Bottom safe area padding
           ],
         ),
       ),
     );
   }
 
-  // 🔹 Updated Helper: Handles the index switching
-  Widget _drawerItem(IconData icon, String text, int index) {
-    // Check if this item is the one currently selected
+  // 🔹 Passed BuildContext so we can pop the drawer on tap
+  Widget _drawerItem(
+    BuildContext context,
+    IconData icon,
+    String text,
+    int index,
+  ) {
     bool isSelected = selectedIndex == index;
 
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? Colors.greenAccent : Colors.white,
-      ),
-      title: Text(
-        text,
-        style: TextStyle(
-          color: isSelected ? Colors.greenAccent : Colors.white,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    return Padding(
+      // 🔹 Added horizontal padding for the modern "floating pill" look
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        leading: Icon(icon, color: isSelected ? Colors.green : Colors.white70),
+        title: Text(
+          text,
+          style: TextStyle(
+            color: isSelected ? Colors.green : Colors.white70,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
         ),
+        selected: isSelected,
+        selectedTileColor: Colors.white.withOpacity(0.08),
+        onTap: () {
+          // 🔹 FIX: Close the drawer automatically when an item is tapped
+          Navigator.pop(context);
+          onItemTapped(index);
+        },
       ),
-      // Background highlight for the selected item
-      selected: isSelected,
-      selectedTileColor: Colors.white.withOpacity(0.1),
-      onTap: () {
-        onItemTapped(index);
-      },
     );
   }
 }

@@ -37,19 +37,18 @@ class _MainWrapperState extends State<MainWrapper> {
     setState(() {
       _selectedIndex = index;
     });
-    
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF122D5A),
+        backgroundColor: const Color(0xFF162447),
         elevation: 0,
         centerTitle: true,
         title: Image.asset(
           'assets/icons/GARDIAN_TEXT.png',
-          height: 180,
+          height: 150,
           color: Colors.white,
         ),
         iconTheme: const IconThemeData(color: Colors.white),
