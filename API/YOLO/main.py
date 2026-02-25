@@ -18,7 +18,8 @@ def load_models():
     print("Loading YOLO models...")
     # .pt files 
     models["Drainage"] = YOLO("v5.pt")  
-    models["Pothole"] = YOLO("pothole_v2.pt")    
+    models["Pothole"] = YOLO("pothole_v2.pt")
+    models["Manhole"] = YOLO("manhole_v1.pt")     
     print(f"Models loaded: {list(models.keys())}")
 
 # --- Helper Functions from your existing logic ---
@@ -104,7 +105,7 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
             # Logic for Potholes and other models (Detection only)
             response_data.update({
                 "status": "Detected" if all_boxes else "Clear",
-                "blockage_percent": None # Ensures Flutter app doesn't crash
+                "blockage_percent": None 
             })
 
         # Encode image
