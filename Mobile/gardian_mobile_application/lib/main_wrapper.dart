@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/home/home_page.dart';
 import 'screens/feedback_page.dart';
 import 'screens/contact_page.dart';
-import 'screens/home/about_page.dart';
+import 'screens/about_page.dart';
 import 'screens/profile_page.dart';
 import '../widgets/custom_drawer.dart';
 import '../widgets/notification_icon.dart';

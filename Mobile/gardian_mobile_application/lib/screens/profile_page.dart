@@ -34,6 +34,7 @@ class _ProfilePageState extends State<ProfilePage> {
     "San Juan",
     "San Jose",
     "Poblacion",
+    "Santo Niño",
   ];
 
   @override
