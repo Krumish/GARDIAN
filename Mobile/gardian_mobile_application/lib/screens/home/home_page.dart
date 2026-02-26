@@ -13,8 +13,19 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   Set<String> _activeFilters = {"All"};
 
-  // 🔹 Separated the filters into logical groups
-  final List<String> _typeFilters = ["All", "Drainage", "Pothole"];
+  // 🔹 ADDED: State variable to control collapse/expand
+  bool _isFiltersExpanded = false;
+
+  // 🔹 UPDATED: Added missing Issue Types and standard Statuses
+  final List<String> _typeFilters = [
+    "All",
+    "Drainage",
+    "Pothole",
+    "Manhole",
+    "Road Markings",
+    "Waste Management",
+    "Road Blockage",
+  ];
   final List<String> _statusFilters = ["Pending", "Resolved", "Withdrawn"];
 
   // 🔹 Unified the app theme color
@@ -52,37 +63,85 @@ class _HomePageState extends State<HomePage> {
 
           const SizedBox(height: 16),
 
-          // 🔹 Section Title
+          // 🔹 UPDATED: Section Title with a Toggle Button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              "My Reports",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: navyColor,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "My Reports",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: navyColor,
+                  ),
+                ),
+
+                // Toggle Button for Filters
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _isFiltersExpanded = !_isFiltersExpanded;
+                    });
+                  },
+                  icon: Icon(
+                    _isFiltersExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.filter_list_rounded,
+                    color: navyColor,
+                    size: 20,
+                  ),
+                  label: Text(
+                    _isFiltersExpanded ? "Hide Filters" : "Filter",
+                    style: TextStyle(
+                      color: navyColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: navyColor.withOpacity(0.05),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 12),
-
-          // 🔹 FILTER SECTION 1: Issue Type
-          _buildFilterRow("Issue Type", _typeFilters),
-
-          const SizedBox(height: 8),
-
-          // 🔹 FILTER SECTION 2: Status
-          _buildFilterRow("Status", _statusFilters),
-
-          const SizedBox(height: 12),
+          // 🔹 ADDED: Smooth Collapsible Filter Section
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            crossFadeState: _isFiltersExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(
+              height: 12,
+              width: double.infinity,
+            ), // What shows when collapsed
+            secondChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                _buildFilterRow("Issue Type", _typeFilters),
+                const SizedBox(height: 12),
+                _buildFilterRow("Status", _statusFilters),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
 
           // 🔹 REPORT LIST
           Expanded(child: ReportHistory(selectedFilters: _activeFilters)),
         ],
       ),
 
-      // 🔹 FLOATING ACTION BUTTON
+      // FLOATING ACTION BUTTON
       floatingActionButton: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -118,7 +177,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 🔹 Helper Widget for clean, reusable filter rows
+  // Helper Widget for clean, reusable filter rows
   Widget _buildFilterRow(String title, List<String> filters) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

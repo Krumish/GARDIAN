@@ -4,7 +4,7 @@ import 'package:gardian_mobile_application/widgets/report_detail_page.dart';
 import '../services/auth_services.dart';
 import '../services/storage_service.dart';
 
-const Color _navyColor = Color(0xFF162447); // 🔹 Lifted out for easier access
+const Color _navyColor = Color(0xFF162447);
 
 class ReportHistory extends StatelessWidget {
   final Set<String> selectedFilters;
@@ -31,7 +31,6 @@ class ReportHistory extends StatelessWidget {
           );
         }
 
-        // 🔹 SMART FILTERING LOGIC
         final uploads = snapshot.data!.docs.where((doc) {
           if (selectedFilters.isEmpty || selectedFilters.contains("All"))
             return true;
@@ -43,6 +42,10 @@ class ReportHistory extends StatelessWidget {
           final activeTypes = selectedFilters.intersection({
             "Drainage",
             "Pothole",
+            "Manhole",
+            "Road Markings",
+            "Waste Management",
+            "Road Blockage",
           });
           final activeStatuses = selectedFilters.intersection({
             "Pending",
@@ -110,20 +113,30 @@ class ReportHistory extends StatelessWidget {
   }
 }
 
-// 🔹 EXTRACTED WIDGET: Makes your main file 100x easier to read.
-class _ReportCard extends StatelessWidget {
+class _ReportCard extends StatefulWidget {
   final String reportId;
   final Map<String, dynamic> data;
 
   const _ReportCard({required this.reportId, required this.data});
 
   @override
+  State<_ReportCard> createState() => _ReportCardState();
+}
+
+class _ReportCardState extends State<_ReportCard>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
-    final url = data['url'] as String?;
-    final status = data['status'] ?? "Pending";
-    final issueType = data['issueType'] ?? "Unknown";
-    final address = data['address'] ?? "No address provided";
-    final yolo = data['yolo'] as Map<String, dynamic>? ?? {};
+    super.build(context);
+
+    final url = widget.data['url'] as String?;
+    final status = widget.data['status'] ?? "Pending";
+    final issueType = widget.data['issueType'] ?? "Unknown";
+    final address = widget.data['address'] ?? "No address provided";
+    final yolo = widget.data['yolo'] as Map<String, dynamic>? ?? {};
     final obstructions = (yolo['obstructions'] as List?)?.length ?? 0;
 
     Color statusColor;
@@ -152,7 +165,8 @@ class _ReportCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ReportDetailPage(reportId: reportId, data: data),
+            builder: (_) =>
+                ReportDetailPage(reportId: widget.reportId, data: widget.data),
           ),
         );
       },
@@ -184,6 +198,8 @@ class _ReportCard extends StatelessWidget {
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      // 🔹 Optional but recommended: reduces RAM usage for large network images
+                      cacheHeight: 400,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
                         return Container(
@@ -251,7 +267,7 @@ class _ReportCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        "#${reportId.substring(0, 6).toUpperCase()}",
+                        "#${widget.reportId.substring(0, 6).toUpperCase()}",
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 12,

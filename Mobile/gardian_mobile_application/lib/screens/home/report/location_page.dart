@@ -3,18 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'analysis_loading_page.dart';
-import 'confirmation_page.dart'; // 🔹 ADDED: Import the confirmation page
+import 'confirmation_page.dart';
 
 class LocationPage extends StatefulWidget {
   final File imageFile;
   final String issueType;
-  final bool requiresAI; // 🔹 ADDED: Flag to determine routing
+  final bool requiresAI;
 
   const LocationPage({
     super.key,
     required this.imageFile,
     required this.issueType,
-    required this.requiresAI, // 🔹 Make it required
+    required this.requiresAI,
   });
 
   @override
@@ -87,7 +87,7 @@ class _LocationPageState extends State<LocationPage> {
 
     setState(() => _processing = true);
 
-    // 🔹 THE FORK IN THE ROAD: YOLO vs MANUAL
+    // THE FORK IN THE ROAD: YOLO vs MANUAL
     if (widget.requiresAI) {
       Navigator.push(
         context,
@@ -107,7 +107,7 @@ class _LocationPageState extends State<LocationPage> {
             imageFile: widget.imageFile,
             selectedCoordinate: _selectedCoordinate!,
             issueType: widget.issueType,
-            yoloResults: null, // 🔹 Bypass YOLO, pass null for AI results
+            yoloResults: null,
           ),
         ),
       );
@@ -147,7 +147,7 @@ class _LocationPageState extends State<LocationPage> {
             )
           : Stack(
               children: [
-                // 🔹 Full Screen Map
+                // Full Screen Map
                 GoogleMap(
                   onMapCreated: (controller) => _mapController = controller,
                   myLocationEnabled: true,
@@ -174,7 +174,7 @@ class _LocationPageState extends State<LocationPage> {
                   onTap: (pos) => setState(() => _selectedCoordinate = pos),
                 ),
 
-                // 🔹 Floating Instruction Card (Top)
+                // Floating Instruction Card
                 Positioned(
                   top: 16,
                   left: 16,
@@ -217,7 +217,7 @@ class _LocationPageState extends State<LocationPage> {
                   ),
                 ),
 
-                // 🔹 Action Button (Bottom)
+                // Action Button
                 Positioned(
                   bottom: 32,
                   left: 24,
@@ -229,7 +229,7 @@ class _LocationPageState extends State<LocationPage> {
                       onPressed: (_processing || _selectedCoordinate == null)
                           ? null
                           : _processAndConfirm,
-                      // 🔹 DYNAMIC ICON based on flag
+
                       icon: _processing
                           ? const SizedBox.shrink()
                           : Icon(
@@ -237,7 +237,7 @@ class _LocationPageState extends State<LocationPage> {
                                   ? Icons.analytics_outlined
                                   : Icons.arrow_forward_rounded,
                             ),
-                      // 🔹 DYNAMIC TEXT based on flag
+
                       label: _processing
                           ? const CircularProgressIndicator(color: Colors.white)
                           : Text(
@@ -250,7 +250,7 @@ class _LocationPageState extends State<LocationPage> {
                               ),
                             ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green, // 🔹 Consistent Green
+                        backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
                         elevation: 4,
                         shape: RoundedRectangleBorder(
