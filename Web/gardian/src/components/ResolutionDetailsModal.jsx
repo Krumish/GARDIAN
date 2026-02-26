@@ -2,7 +2,7 @@ import React from 'react';
 import { FaTimes, FaCheckCircle, FaUserShield, FaClock, FaClipboardCheck, FaStickyNote, FaCalendarAlt, FaImage } from 'react-icons/fa';
 import { MdAssignment } from 'react-icons/md';
 
-// Helper component for info rows (matching ReportDetailsModal style)
+// Helper component for info rows
 const InfoRow = ({ label, value, badge }) => (
   <div className="mb-3">
     <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1.5">{label}</div>
@@ -54,7 +54,7 @@ const ResolutionDetailsModal = ({ selectedReport, onClose }) => {
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         
-        {/* Header - Matching ReportDetailsModal style */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 flex items-center justify-between border-b border-emerald-800">
           <div>
             <h2 className="text-2xl font-bold text-white">Resolution Details</h2>
