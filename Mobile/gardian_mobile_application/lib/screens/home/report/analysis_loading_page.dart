@@ -44,7 +44,13 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
       }
 
       final allBoxes = results["boxes"] as List? ?? [];
+      final status = results["status"]?.toString() ?? "";
 
+      if (widget.issueType == "Drainage" && status == "No Drainage Detected") {
+        return _triggerError("No drainage infrastructure detected.");
+      }
+
+      // 🔹 FIX 2: Standard empty check for Potholes/Manholes
       if (allBoxes.isEmpty) {
         return _triggerError(
           "No ${widget.issueType.toLowerCase()} anomalies detected.\nPlease upload a clearer image or try a different angle.",
@@ -52,7 +58,7 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
       }
 
       final yoloSummary = {
-        "status": results["status"],
+        "status": status,
         "boxes": allBoxes,
         "blockage_percent": results["blockage_percent"],
         "max_blockage_ratio": results["max_blockage_ratio"],

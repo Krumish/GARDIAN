@@ -16,13 +16,11 @@ models = {}
 def load_models():
     global models
     print("Loading YOLO models...")
-    # .pt files 
     models["Drainage"] = YOLO("v5.pt")  
     models["Pothole"] = YOLO("pothole_v2.pt")
     models["Manhole"] = YOLO("manhole_v1.pt")     
     print(f"Models loaded: {list(models.keys())}")
 
-# --- Helper Functions from your existing logic ---
 def box_area(box):
     x1, y1, x2, y2 = box
     return max(0, x2 - x1) * max(0, y2 - y1)
@@ -37,7 +35,14 @@ def overlap_area(box1, box2):
     return 0
 
 SEVERITY_WEIGHTS = {
-    "rocks": 1.0, "silt": 0.9, "trash": 0.7, "leaves": 0.4, "cracks": 0.6,
+    "rocks": 1.0, "silt": 0.9, "trash": 0.7, "leaves": 0.4,
+}
+
+# 🔹 ADDED: Strict class filtering dictionary
+EXPECTED_CLASSES = {
+    "Drainage": ["drainages", "rocks", "silt", "trash", "leaves"],
+    "Pothole": ["pothole", "potholes"], 
+    "Manhole": ["manhole", "manholes"]
 }
 
 @app.post("/detect/")
@@ -55,26 +60,27 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
         results = model(temp_name)
         annotated_image = results[0].plot(conf=False, labels=True, boxes=True)
         
-        # General detection data
         all_boxes = []
+        valid_classes = EXPECTED_CLASSES.get(issue_type, [])
+
         for r in results:
             for box in r.boxes:
-                all_boxes.append({
-                    "class": r.names[int(box.cls)].lower(),
-                    "confidence": round(float(box.conf), 3),
-                    "box": box.xyxy[0].tolist()
-                })
+                class_name = r.names[int(box.cls)].lower()
+                
+                # 🔹 FIX: Only append the box if it matches what the user is reporting!
+                if not valid_classes or class_name in valid_classes:
+                    all_boxes.append({
+                        "class": class_name,
+                        "confidence": round(float(box.conf), 3),
+                        "box": box.xyxy[0].tolist()
+                    })
 
-
-
-        # --- RESPONSE OBJECT INITIALIZATION ---
         response_data = {
             "issue_type": issue_type,
             "detection_count": len(all_boxes),
             "boxes": all_boxes,
         }
 
-        # --- SPECIAL LOGIC FOR DRAINAGE ---
         if issue_type == "Drainage":
             drainage_boxes = [b["box"] for b in all_boxes if b["class"] == "drainages"]
             obstructions = [b for b in all_boxes if b["class"] in SEVERITY_WEIGHTS]
@@ -102,13 +108,11 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
                 "obstruction_count": len(obstructions)
             })
         else:
-            # Logic for Potholes and other models (Detection only)
             response_data.update({
                 "status": "Detected" if all_boxes else "Clear",
                 "blockage_percent": None 
             })
 
-        # Encode image
         _, buffer = cv2.imencode(".jpg", annotated_image)
         response_data["annotated_image"] = base64.b64encode(buffer).decode("utf-8")
 
