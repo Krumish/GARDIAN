@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // 🔹 Added for password reset
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../auth_wrapper.dart';
 import '../../services/auth_services.dart';
 import 'register_page.dart';
@@ -18,14 +18,48 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  String _getFriendlyErrorMessage(dynamic error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-credential':
+        case 'wrong-password':
+        case 'user-not-found':
+          return "Incorrect email or password. Please try again.";
+        case 'invalid-email':
+          return "Please enter a valid email address.";
+        case 'user-disabled':
+          return "This account has been disabled. Please contact support.";
+        case 'network-request-failed':
+          return "Network error. Please check your internet connection.";
+        case 'too-many-requests':
+          return "Too many attempts. Please try again later.";
+        default:
+          return "Authentication failed. Please try again.";
+      }
+    }
+    return "Something went wrong. Please check your connection and try again.";
+  }
+
   void _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    // Added basic validation before hitting Firebase
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter both email and password."),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      await authService.value.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      await authService.value.signIn(email: email, password: password);
 
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -37,8 +71,9 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login Failed: $e'),
+            content: Text(_getFriendlyErrorMessage(e)),
             backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -121,6 +156,9 @@ class _LoginPageState extends State<LoginPage> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Please enter an email address'),
+                                backgroundColor: Colors.orange,
+                                behavior: SnackBarBehavior
+                                    .floating, // 🔹 Unified floating style
                               ),
                             );
                             return;
@@ -128,10 +166,8 @@ class _LoginPageState extends State<LoginPage> {
 
                           setState(() => isResetting = true);
                           try {
-                            // Send reset email via Firebase Auth
-                            await FirebaseAuth.instance.sendPasswordResetEmail(
-                              email: email,
-                            );
+                            await authService.value.resetPassword(email: email);
+
                             if (context.mounted) {
                               Navigator.pop(context); // Close dialog
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -140,6 +176,8 @@ class _LoginPageState extends State<LoginPage> {
                                     'Password reset email sent! Check your inbox.',
                                   ),
                                   backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior
+                                      .floating, // 🔹 Unified floating style
                                 ),
                               );
                             }
@@ -147,8 +185,10 @@ class _LoginPageState extends State<LoginPage> {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Error: ${e.toString()}'),
+                                  content: Text(_getFriendlyErrorMessage(e)),
                                   backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior
+                                      .floating, // 🔹 Unified floating style
                                 ),
                               );
                             }
@@ -238,7 +278,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Forgot Password 🔹 Updated to trigger the dialog
+                      // Forgot Password
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
@@ -285,8 +325,6 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ],
                       ),
-
-                      // 🔹 Google Sign-in completely removed from here
                     ],
                   ),
                 ),

@@ -13,11 +13,11 @@ class YoloService {
     try {
       // For production
 
-      // final url = await ConfigService.getYoloUrl();
-      // final uri = Uri.parse(url);
+      final url = await ConfigService.getYoloUrl();
+      final uri = Uri.parse(url);
 
       // For local testing on Android Emulator
-      final uri = Uri.parse("http://10.0.2.2:8000/detect/");
+      // final uri = Uri.parse("http://10.0.2.2:8000/detect/");
 
       final request = http.MultipartRequest("POST", uri);
 

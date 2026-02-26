@@ -8,7 +8,7 @@ class AuthService {
 
   User? get currentUser => firebaseAuth.currentUser;
 
-  Stream<User?> get authStateChages => firebaseAuth.authStateChanges();
+  Stream<User?> get authStateChanges => firebaseAuth.authStateChanges();
 
   Future<UserCredential> signIn({
     required String email,
@@ -71,14 +71,23 @@ class AuthService {
   Future<void> sendOtp({
     required String phoneNumber,
     required Function(String verificationId) codeSent,
-    required Function(String error) onError,
+
+    required Function(FirebaseAuthException error) onError,
   }) async {
+    String formattedPhone = phoneNumber.replaceAll(' ', '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = formattedPhone.substring(1); // Remove leading 0
+    }
+    if (!formattedPhone.startsWith('+63')) {
+      formattedPhone = '+63$formattedPhone';
+    }
+
     await firebaseAuth.verifyPhoneNumber(
-      phoneNumber: '+63${phoneNumber.replaceAll(' ', '')}',
+      phoneNumber: formattedPhone,
       timeout: const Duration(seconds: 60),
       verificationCompleted: (PhoneAuthCredential credential) {},
       verificationFailed: (FirebaseAuthException e) {
-        onError(e.message ?? "Phone verification failed");
+        onError(e);
       },
       codeSent: (String verificationId, int? resendToken) {
         codeSent(verificationId);

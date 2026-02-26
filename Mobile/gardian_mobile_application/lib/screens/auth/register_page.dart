@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // 🔹 Added for error handling
 import 'package:gardian_mobile_application/screens/auth/login_page.dart';
 import '../../services/auth_services.dart';
 import 'otp_page.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart'; // 🔹 Added this import
+import '../../widgets/custom_button.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -19,11 +20,11 @@ class _RegisterPageState extends State<RegisterPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  // 🔹 Dropdown state
+  // Dropdown state
   String? _selectedBarangay;
   bool _isLoading = false;
 
-  // 🔹 List of Cainta Barangays
+  // List of Cainta Barangays
   final List<String> _caintaBarangays = [
     "San Andres (Poblacion)",
     "San Roque",
@@ -33,6 +34,28 @@ class _RegisterPageState extends State<RegisterPage> {
     "San Isidro",
     "Santa Rosa",
   ];
+
+  String _getFriendlyErrorMessage(dynamic error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'email-already-in-use':
+          return "This email is already registered. Please log in.";
+        case 'invalid-email':
+          return "Please enter a valid email address.";
+        case 'weak-password':
+          return "Your password is too weak. Please use a stronger password.";
+        case 'invalid-phone-number':
+          return "Please enter a valid phone number (e.g., +639...).";
+        case 'network-request-failed':
+          return "Network error. Please check your internet connection.";
+        case 'too-many-requests':
+          return "Too many attempts. Please try again later.";
+        default:
+          return "Registration failed. Please try again.";
+      }
+    }
+    return "Something went wrong. Please check your connection and try again.";
+  }
 
   void _sendOtp() async {
     // 🔹 Added validation for all fields
@@ -45,6 +68,7 @@ class _RegisterPageState extends State<RegisterPage> {
         const SnackBar(
           content: Text("Please fill in all fields"),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -55,6 +79,7 @@ class _RegisterPageState extends State<RegisterPage> {
         const SnackBar(
           content: Text("Please select a Barangay"),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -76,7 +101,7 @@ class _RegisterPageState extends State<RegisterPage> {
               password: _passwordController.text.trim(),
               firstName: _firstNameController.text.trim(),
               lastName: _lastNameController.text.trim(),
-              barangay: _selectedBarangay!, // Pass the selected value
+              barangay: _selectedBarangay!,
               phone: _phoneController.text.trim(),
             ),
           ),
@@ -87,8 +112,9 @@ class _RegisterPageState extends State<RegisterPage> {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Error: $error"),
+              content: Text(_getFriendlyErrorMessage(error)),
               backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -103,18 +129,16 @@ class _RegisterPageState extends State<RegisterPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // 🔹 Logo Section (Matches Login Page structure)
             Expanded(
               flex: 2,
               child: Center(
-                // Slightly smaller logo here to accommodate more form fields
                 child: Image.asset("assets/icons/GARDIAN.png", height: 180),
               ),
             ),
 
-            // 🔹 Form Section
+            // Form Section
             Expanded(
-              flex: 5, // Gives more room for the longer registration form
+              flex: 5,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -132,7 +156,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       const Text(
                         "Sign up",
                         style: TextStyle(
-                          fontSize: 22, // 🔹 Matched login header size
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -221,7 +245,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       const SizedBox(height: 20),
 
-                      // 🔹 Unified CustomButton usage
                       CustomButton(
                         text: "Register",
                         isLoading: _isLoading,
@@ -240,7 +263,6 @@ class _RegisterPageState extends State<RegisterPage> {
                             TextButton(
                               onPressed: () {
                                 Navigator.pushReplacement(
-                                  // 🔹 Use replacement to prevent stacking too many pages
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => const LoginPage(),
