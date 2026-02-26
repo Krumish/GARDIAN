@@ -137,47 +137,45 @@ export default function Analytics() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Analytics</h1>
 
-      {/* Top Summary Cards */}
-<div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4">
-  {/* Avg. Resolution Speed */}
-  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
-    <FaClock className="text-blue-500 text-3xl mr-4" />
-    <div>
-      <p className="text-sm text-gray-500">Avg. Resolution Speed</p>
-      <p className="text-xl font-bold text-gray-800">2.4 Days</p>
-      <p className="text-xs text-green-500 font-medium">12% Faster</p>
-    </div>
-  </div>
+{/* Top Summary Cards */}
+<div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
 
-  {/* Active Citizens Reporting */}
-  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
-    <FaUsers className="text-emerald-500 text-3xl mr-4" />
-    <div>
-      <p className="text-sm text-gray-500">Active Citizens Reporting</p>
-      <p className="text-xl font-bold text-gray-800">217 Users</p>
-      <p className="text-xs text-green-500 font-medium">+8% Growth</p>
-    </div>
-  </div>
+  <StatCard
+    title="Avg. Resolution Speed"
+    value="2.4 Days"
+    subtitle="12% Faster"
+    subtitleColor="text-green-500"
+    bgColor="bg-blue-50"
+    icon={<FaClock className="text-blue-500 w-10 h-10" />}
+  />
 
-  {/* Immediate High Risk */}
-  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
-    <FaExclamationTriangle className="text-red-500 text-3xl mr-4" />
-    <div>
-      <p className="text-sm text-gray-500">Immediate High-Risk Reports</p>
-      <p className="text-xl font-bold text-gray-800">42 Reports</p>
-      <p className="text-xs text-red-500 font-medium">Action Required</p>
-    </div>
-  </div>
+  <StatCard
+    title="Active Citizens Reporting"
+    value="217 Users"
+    subtitle="+8% Growth"
+    subtitleColor="text-green-500"
+    bgColor="bg-emerald-50"
+    icon={<FaUsers className="text-emerald-500 w-10 h-10" />}
+  />
 
-  {/* Proactive Reports Closed */}
-  <div className="bg-white p-5 rounded-xl shadow flex items-center hover:shadow-lg transition">
-    <FiCheckCircle className="text-purple-500 text-3xl mr-4" />
-    <div>
-      <p className="text-sm text-gray-500">Proactive Reports Closed</p>
-      <p className="text-xl font-bold text-gray-800">95 Reports</p>
-      <p className="text-xs text-indigo-500 font-medium">15% of Total</p>
-    </div>
-  </div>
+  <StatCard
+    title="Immediate High-Risk Reports"
+    value="42 Reports"
+    subtitle="Action Required"
+    subtitleColor="text-red-500"
+    bgColor="bg-red-50"
+    icon={<FaExclamationTriangle className="text-red-500 w-10 h-10" />}
+  />
+
+  <StatCard
+    title="Proactive Reports Closed"
+    value="95 Reports"
+    subtitle="15% of Total"
+    subtitleColor="text-indigo-500"
+    bgColor="bg-purple-50"
+    icon={<FiCheckCircle className="text-purple-500 w-10 h-10" />}
+  />
+
 </div>
 
 
@@ -234,3 +232,31 @@ export default function Analytics() {
     </div>
   );
 }
+
+  {/* statcard */}
+const StatCard = ({ title, value, color, bgColor, icon, subtitle, subtitleColor }) => {
+  return (
+    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-6 min-h-[130px] flex items-center justify-between border border-gray-100">
+
+      <div>
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          {title}
+        </p>
+
+        <p className="text-2xl font-bold text-gray-800 mt-2">
+          {value}
+        </p>
+
+        {subtitle && (
+          <p className={`text-xs font-medium mt-1 ${subtitleColor}`}>
+            {subtitle}
+          </p>
+        )}
+      </div>
+
+      <div className={`p-4 rounded-xl ${bgColor}`}>
+        {icon}
+      </div>
+    </div>
+  );
+};

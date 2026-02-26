@@ -69,11 +69,11 @@ export default function ResolveReportModal({ report, onClose, onSuccess }) {
   const [assignedTeam, setAssignedTeam] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Admin details (auto-fetched)
+  // Admin details 
   const [adminDetails, setAdminDetails] = useState(null);
   const [loadingAdmin, setLoadingAdmin] = useState(true);
 
-  // Generate reference code (same as Reports.jsx)
+  // Generate reference code 
   const generateRefCode = (report) => {
     if (!report || !report.id) return "REF-00000000-XXXXX";
     const ts = report.uploadedAt;
