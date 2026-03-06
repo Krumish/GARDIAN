@@ -299,39 +299,6 @@ class _ReportCardState extends State<_ReportCard>
                       ),
                     ],
                   ),
-                  if (issueType == "Drainage" && obstructions > 0) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _navyColor.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: _navyColor.withOpacity(0.1)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.analytics_rounded,
-                            color: _navyColor,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            "AI Detected: $obstructions Obstruction(s)",
-                            style: const TextStyle(
-                              color: _navyColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
