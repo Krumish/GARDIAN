@@ -3,6 +3,7 @@ import { FaSearch, FaUserPlus, FaEdit, FaTrash, FaFilter } from "react-icons/fa"
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { FaUsers, FaUserShield, FaUserTie, FaUser } from "react-icons/fa";
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -13,6 +14,10 @@ export default function UserManagement() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const totalAdmins = users.length;
+  const superAdmins = users.filter(u => u.role === "super_admin").length;
+  const personnelAdmins = users.filter(u => u.role === "personnel_admin").length;
+  const staffAdmins = users.filter(u => u.role === "staff_admin").length;
   
   // ✅ Define admin roles (must match Login.jsx)
   const ADMIN_ROLES = ["super_admin", "personnel_admin", "staff_admin"];
@@ -124,7 +129,7 @@ export default function UserManagement() {
         lastName: newUser.lastName,
         phone: newUser.phone,
         status: newUser.status,
-        role: newUser.role, // ✅ Now uses the selected role
+        role: newUser.role, 
         createdAt: new Date(),
       });
 
@@ -163,7 +168,7 @@ export default function UserManagement() {
         lastName: editUser.lastName,
         phone: editUser.phone || "",
         status: editUser.status,
-        role: editUser.role // ✅ Include role in update
+        role: editUser.role 
       };
 
       // Only update email if it changed
@@ -242,31 +247,40 @@ export default function UserManagement() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">User Management</h1>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Total Admins</h3>
-          <p className="text-3xl font-bold mt-2">{users.length}</p>
-        </div>
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Super Admins</h3>
-          <p className="text-3xl font-bold mt-2 text-purple-500">
-            {users.filter(u => u.role === "super_admin").length}
-          </p>
-        </div>
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Personnel Admins</h3>
-          <p className="text-3xl font-bold mt-2 text-blue-500">
-            {users.filter(u => u.role === "personnel_admin").length}
-          </p>
-        </div>
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Staff Admins</h3>
-          <p className="text-3xl font-bold mt-2 text-indigo-500">
-            {users.filter(u => u.role === "staff_admin").length}
-          </p>
-        </div>
-      </div>
+{/* Summary Cards */}
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+  <StatCard
+    title="Super Admins"
+    value={superAdmins}
+    color="text-purple-600"
+    bgColor="bg-purple-50"
+    icon={<FaUserShield className="text-purple-600 w-10 h-10" />}
+  />
+
+  <StatCard
+    title="Personnel Admins"
+    value={personnelAdmins}
+    color="text-blue-600"
+    bgColor="bg-blue-50"
+    icon={<FaUserTie className="text-blue-600 w-10 h-10" />}
+  />
+
+  <StatCard
+    title="Staff Admins"
+    value={staffAdmins}
+    color="text-indigo-600"
+    bgColor="bg-indigo-50"
+    icon={<FaUser className="text-indigo-600 w-10 h-10" />}
+  />
+
+    <StatCard
+    title="Total Admins"
+    value={totalAdmins}
+    color="text-gray-800"
+    bgColor="bg-gray-100"
+    icon={<FaUsers className="text-gray-600 w-10 h-10" />}
+  />
+</div>
 
       {/* Search, Filter, and Add User Section */}
       <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
@@ -741,4 +755,28 @@ export default function UserManagement() {
     </div>
   );
 }
+
+  {/* summary card */}
+const StatCard = ({ title, value, color, bgColor, icon }) => {
+  return (
+    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-6 min-h-[140px] flex items-center justify-between border border-gray-100">
+      
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          {title}
+        </h3>
+
+        <p className={`text-3xl font-bold mt-2 ${color || "text-gray-800"}`}>
+          {value}
+        </p>
+      </div>
+
+      {icon && (
+        <div className={`p-4 rounded-xl ${bgColor}`}>
+          {icon}
+        </div>
+      )}
+    </div>
+  );
+};
        

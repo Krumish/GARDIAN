@@ -214,33 +214,41 @@ function Dashboard({ reports, recentReports }) {
     <>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard
-          title="Pending"
-          value={pendingCount}
-          color="text-orange-500"
-          icon={<RiHourglassFill className="text-orange-500 w-8 h-8" />}
-        />
-        <StatCard
-          title="Withdrawn"
-          value={withdrawnCount}
-          color="text-gray-500"
-          icon={<TbReportOff className="text-gray-500 w-8 h-8" />}
-        />
-        <StatCard
-          title="Resolved"
-          value={resolvedCount}
-          color="text-green-500"
-          icon={<FaHistory className="text-green-500 w-8 h-8" />}
-        />
-        <StatCard
-          title="Total Reports"
-          value={totalCount}
-          color="text-blue-500"
-          icon={<FaUsers className="text-blue-500 w-8 h-8" />}
-        />
-      </div>
+{/* Stats Cards */}
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+  <StatCard
+    title="Pending"
+    value={pendingCount}
+    color="text-orange-500"
+    bgColor="bg-orange-50"
+    icon={<RiHourglassFill className="text-orange-500 w-10 h-10" />}
+  />
+
+  <StatCard
+    title="Withdrawn"
+    value={withdrawnCount}
+    color="text-gray-500"
+    bgColor="bg-gray-100"
+    icon={<TbReportOff className="text-gray-500 w-10 h-10" />}
+  />
+
+  <StatCard
+    title="Resolved"
+    value={resolvedCount}
+    color="text-green-500"
+    bgColor="bg-green-50"
+    icon={<FaHistory className="text-green-500 w-10 h-10" />}
+  />
+
+  <StatCard
+    title="Total Reports"
+    value={totalCount}
+    color="text-blue-500"
+    bgColor="bg-blue-50"
+    icon={<FaUsers className="text-blue-500 w-10 h-10" />}
+  />
+</div>
 
       {/* Chart */}
       <div className="p-6 bg-white rounded-xl shadow mb-6">
@@ -361,15 +369,25 @@ function Dashboard({ reports, recentReports }) {
   );
 }
 
-// ---------------- Helper Components ----------------
-function StatCard({ title, value, icon, color }) {
+const StatCard = ({ title, value, bgColor, color, icon }) => {
   return (
-    <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-sm font-medium text-gray-500">{title}</h3>
+    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-6 min-h-[140px] flex items-center justify-between border border-gray-100">
+      
+      {/* Left Content */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          {title}
+        </h3>
+
+        <p className={`text-3xl font-bold mt-2 ${color}`}>
+          {value}
+        </p>
+      </div>
+
+      {/* Icon */}
+      <div className={`p-4 rounded-xl ${bgColor}`}>
         {icon}
       </div>
-      <p className={`text-3xl font-bold ${color}`}>{value}</p>
     </div>
   );
 }

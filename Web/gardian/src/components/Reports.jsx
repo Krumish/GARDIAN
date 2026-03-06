@@ -38,6 +38,10 @@ export default function Reports() {
   const dateObj = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
   const dateStr = dateObj && !isNaN(dateObj) ? dateObj.toISOString().slice(0, 10).replace(/-/g, "") : "00000000";
   const shortHash = report.id.slice(-5).toUpperCase();return `REF-${dateStr}-${shortHash}`;};
+  const pendingCount = reports.filter(r => r.status === "Pending").length;
+  const withdrawnCount = reports.filter(r => r.status === "Withdrawn").length;
+  const resolvedCount = reports.filter(r => r.status === "Resolved").length;
+  const totalCount = reports.length;
 
 
   // Fetch all uploads across all users in real-time
@@ -215,50 +219,41 @@ const handleExportDOC = () => {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Reports</h1>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Pending */}
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Pending</h3>
-          <div className="flex items-center mt-2 text-orange-500">
-            <RiHourglassFill className="mr-2" />
-            <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "Pending").length}
-            </p>
-          </div>
-        </div>
+{/* Summary Cards */}
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 
-        {/* Withdrawn */}
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Withdrawn</h3>
-          <div className="flex items-center mt-2 text-gray-500">
-            <TbReportOff className="mr-2" />
-            <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "Withdrawn").length}
-            </p>
-          </div>
-        </div>
+  <StatCard
+    title="Pending"
+    value={pendingCount}
+    color="text-orange-500"
+    bgColor="bg-orange-50"
+    icon={<RiHourglassFill className="text-orange-500 w-10 h-10" />}
+  />
 
-        {/* Resolved */}
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Resolved</h3>
-          <div className="flex items-center mt-2 text-green-500">
-            <FaClockRotateLeft className="mr-2" />
-            <p className="text-2xl font-bold">
-              {reports.filter((r) => r.status === "Resolved").length}
-            </p>
-          </div>
-        </div>
+  <StatCard
+    title="Withdrawn"
+    value={withdrawnCount}
+    color="text-gray-500"
+    bgColor="bg-gray-100"
+    icon={<TbReportOff className="text-gray-500 w-10 h-10" />}
+  />
 
-        {/* Total Reports */}
-        <div className="bg-white border rounded-xl p-6 shadow hover:shadow-lg transition">
-          <h3 className="text-sm text-gray-500">Total Reports</h3>
-          <div className="flex items-center mt-2 text-blue-500">
-            <FaUsers className="mr-2 w-6 h-6" />
-            <p className="text-3xl font-bold">{reports.length}</p>
-          </div>
-        </div>
-      </div>
+  <StatCard
+    title="Resolved"
+    value={resolvedCount}
+    color="text-green-500"
+    bgColor="bg-green-50"
+    icon={<FaClockRotateLeft className="text-green-500 w-10 h-10" />}
+  />
+
+  <StatCard
+    title="Total Reports"
+    value={totalCount}
+    color="text-blue-500"
+    bgColor="bg-blue-50"
+    icon={<FaUsers className="text-blue-500 w-10 h-10" />}
+  />
+</div>
 
       {/* Reports Section */}
       <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
@@ -614,3 +609,25 @@ const handleExportDOC = () => {
     </div>
   );
 }
+  
+const StatCard = ({ title, value, color, bgColor, icon }) => {
+  return (
+    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-6 min-h-[140px] flex items-center justify-between border border-gray-100">
+
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          {title}
+        </h3>
+
+        <p className={`text-3xl font-bold mt-2 ${color}`}>
+          {value}
+        </p>
+      </div>
+
+      <div className={`p-4 rounded-xl ${bgColor}`}>
+        {icon}
+      </div>
+
+    </div>
+  );
+};

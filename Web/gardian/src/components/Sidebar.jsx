@@ -77,7 +77,7 @@ export default function Sidebar() {
       <div className="p-4 border-t border-gray-700">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-red-600/20 hover:text-red-400 transition-all duration-200 group"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-500 hover:bg-red-600/20 hover:text-red-400 transition-all duration-200 group"
         >
           <FaSignOutAlt className="text-lg group-hover:text-red-400 transition-colors" />
           <span className="font-medium">Log Out</span>
