@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // 🔹 Added for error handling
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gardian_mobile_application/screens/auth/login_page.dart';
 import '../../services/auth_services.dart';
 import 'otp_page.dart';
@@ -58,7 +58,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _sendOtp() async {
-    // 🔹 Added validation for all fields
     if (_firstNameController.text.trim().isEmpty ||
         _lastNameController.text.trim().isEmpty ||
         _emailController.text.trim().isEmpty ||

@@ -82,7 +82,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // 🔹 Forgot Password Feature
   void _showForgotPasswordDialog() {
     final resetEmailController = TextEditingController(
       text: _emailController.text,
@@ -157,8 +156,7 @@ class _LoginPageState extends State<LoginPage> {
                               const SnackBar(
                                 content: Text('Please enter an email address'),
                                 backgroundColor: Colors.orange,
-                                behavior: SnackBarBehavior
-                                    .floating, // 🔹 Unified floating style
+                                behavior: SnackBarBehavior.floating,
                               ),
                             );
                             return;
@@ -176,8 +174,7 @@ class _LoginPageState extends State<LoginPage> {
                                     'Password reset email sent! Check your inbox.',
                                   ),
                                   backgroundColor: Colors.green,
-                                  behavior: SnackBarBehavior
-                                      .floating, // 🔹 Unified floating style
+                                  behavior: SnackBarBehavior.floating,
                                 ),
                               );
                             }
@@ -187,8 +184,7 @@ class _LoginPageState extends State<LoginPage> {
                                 SnackBar(
                                   content: Text(_getFriendlyErrorMessage(e)),
                                   backgroundColor: Colors.redAccent,
-                                  behavior: SnackBarBehavior
-                                      .floating, // 🔹 Unified floating style
+                                  behavior: SnackBarBehavior.floating,
                                 ),
                               );
                             }
@@ -228,7 +224,6 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // 🔹 Logo Section
             Expanded(
               flex: 2,
               child: Center(
@@ -236,7 +231,6 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
 
-            // 🔹 Form Section
             Expanded(
               flex: 3,
               child: Container(
