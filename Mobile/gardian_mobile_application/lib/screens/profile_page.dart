@@ -30,7 +30,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isSaving = false;
 
   final List<String> _barangays = [
-    "San Andres",
+    "San Andres (Poblacion)",
     "San Juan",
     "San Jose",
     "Poblacion",
@@ -194,7 +194,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             // --- HEADER UI ---
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 50, 20, 30),
+              padding: const EdgeInsets.fromLTRB(20, 30, 20, 30),
               decoration: const BoxDecoration(color: Color(0xFF122D5A)),
               child: Row(
                 children: [
