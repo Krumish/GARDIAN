@@ -81,7 +81,7 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
           children: [
             const SizedBox(height: 32),
             Text(
-              "Evidence is Key",
+              "Capture Photo",
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
@@ -90,9 +90,8 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
             ),
             const SizedBox(height: 12),
 
-            // 🔹 Dynamic Text: Tells the user if AI is analyzing this or not
             Text(
-              "Please provide a clear photo of the ${widget.issueType.toLowerCase()} to help us assess the situation. ${widget.requiresAI ? 'GARDIAN AI will analyze this image instantly.' : 'This report will be sent directly to MENRO for manual review.'}",
+              "Please provide a clear photo of the ${widget.issueType.toLowerCase()} to help us assess the situation. ${widget.requiresAI ? 'GARDIAN AI will analyze this image instantly.' : 'This report will be sent directly to MENRO for review.'}",
               style: TextStyle(
                 color: Colors.grey.shade600,
                 fontSize: 16,
