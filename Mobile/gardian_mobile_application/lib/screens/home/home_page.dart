@@ -13,10 +13,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   Set<String> _activeFilters = {"All"};
 
-  // 🔹 ADDED: State variable to control collapse/expand
+  // State variable to control collapse/expand
   bool _isFiltersExpanded = false;
 
-  // 🔹 UPDATED: Added missing Issue Types and standard Statuses
+  // Added missing Issue Types and standard Statuses
   final List<String> _typeFilters = [
     "All",
     "Drainage",
@@ -28,7 +28,6 @@ class _HomePageState extends State<HomePage> {
   ];
   final List<String> _statusFilters = ["Pending", "Resolved", "Withdrawn"];
 
-  // 🔹 Unified the app theme color
   final Color navyColor = const Color(0xFF162447);
 
   void _toggleFilter(String filter) {
@@ -44,7 +43,6 @@ class _HomePageState extends State<HomePage> {
           _activeFilters.add(filter);
         }
 
-        // If user unchecks everything, default back to 'All'
         if (_activeFilters.isEmpty) {
           _activeFilters.add('All');
         }
@@ -63,7 +61,6 @@ class _HomePageState extends State<HomePage> {
 
           const SizedBox(height: 16),
 
-          // 🔹 UPDATED: Section Title with a Toggle Button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -114,16 +111,12 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // 🔹 ADDED: Smooth Collapsible Filter Section
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 300),
             crossFadeState: _isFiltersExpanded
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
-            firstChild: const SizedBox(
-              height: 12,
-              width: double.infinity,
-            ), // What shows when collapsed
+            firstChild: const SizedBox(height: 12, width: double.infinity),
             secondChild: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -136,7 +129,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // 🔹 REPORT LIST
+          //  REPORT LIST
           Expanded(child: ReportHistory(selectedFilters: _activeFilters)),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../auth_wrapper.dart';
 import '../services/auth_services.dart';
 
 class CustomDrawer extends StatelessWidget {
@@ -117,13 +118,23 @@ class CustomDrawer extends StatelessWidget {
                   ),
                 ),
                 onTap: () async {
-                  // 1. Close the drawer first so the app feels instantly responsive
+                  // 1. Close the drawer
                   Navigator.pop(context);
 
-                  // 2. Perform sign out.
-                  // 🔹 FIX: Removed the popUntil. The AuthWrapper will naturally detect
-                  // the auth state change and rebuild the app to show the Login Page.
+                  // 2. Perform sign out
                   await authService.value.signOut();
+
+                  // 3. Ensure the context is still valid after the async call
+                  if (!context.mounted) return;
+
+                  // 4. Clear the entire navigation stack and reset to AuthWrapper
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => const AuthWrapper(),
+                    ),
+                    (Route<dynamic> route) =>
+                        false, // This destroys all previous routes
+                  );
                 },
               ),
             ),
@@ -159,7 +170,6 @@ class CustomDrawer extends StatelessWidget {
         selected: isSelected,
         selectedTileColor: Colors.white.withOpacity(0.08),
         onTap: () {
-          // 🔹 FIX: Close the drawer automatically when an item is tapped
           Navigator.pop(context);
           onItemTapped(index);
         },

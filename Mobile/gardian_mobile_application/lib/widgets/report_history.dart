@@ -198,7 +198,7 @@ class _ReportCardState extends State<_ReportCard>
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      // 🔹 Optional but recommended: reduces RAM usage for large network images
+
                       cacheHeight: 400,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;

@@ -146,8 +146,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
   Widget _buildDetectionSummary(List boxes, Color brandColor) {
     return GestureDetector(
-      onTap: () =>
-          _showAIDetailsModal(context, boxes, brandColor), // 🔹 Opens the modal
+      onTap: () => _showAIDetailsModal(context, boxes, brandColor),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -198,7 +197,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                 ],
               ),
             ),
-            // 🔹 Added a chevron so users know they can tap it
+
             Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
           ],
         ),
@@ -422,7 +421,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
   @override
   Widget build(BuildContext context) {
-    const navyColor = Color(0xFF162447); // 🔹 Updated Navy Theme
+    const navyColor = Color(0xFF162447);
     final allBoxes = (_yoloResults?["boxes"] as List?) ?? [];
     final double? blockagePercent = (_yoloResults?["blockage_percent"] as num?)
         ?.toDouble();

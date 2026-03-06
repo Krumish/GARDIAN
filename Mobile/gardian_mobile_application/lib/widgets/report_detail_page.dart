@@ -21,7 +21,6 @@ class ReportDetailPage extends StatefulWidget {
 class _ReportDetailPageState extends State<ReportDetailPage> {
   Set<String> _imageView = {'Normal'};
 
-  // 🔹 Local state to track status and loading
   late String _currentStatus;
   bool _isWithdrawing = false;
 
@@ -45,7 +44,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     return "Clear";
   }
 
-  // 🔹 Match status colors exactly with ReportHistory
   Color get _statusColor {
     if (_currentStatus == "Resolved") return Colors.green.shade600;
     if (_currentStatus == "Withdrawn") return Colors.grey.shade600;
@@ -293,25 +291,23 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         setState(() => _imageView = newSelection);
                       },
                       style: ButtonStyle(
-                        backgroundColor:
-                            MaterialStateProperty.resolveWith<Color>((
-                              Set<MaterialState> states,
-                            ) {
-                              if (states.contains(MaterialState.selected)) {
-                                return _navyColor.withOpacity(0.1);
-                              }
-                              return Colors.white;
-                            }),
-                        foregroundColor:
-                            MaterialStateProperty.resolveWith<Color>((
-                              Set<MaterialState> states,
-                            ) {
-                              if (states.contains(MaterialState.selected)) {
-                                return _navyColor;
-                              }
-                              return Colors.grey.shade600;
-                            }),
-                        side: MaterialStateProperty.all(
+                        backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                          (Set<WidgetState> states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return _navyColor.withOpacity(0.1);
+                            }
+                            return Colors.white;
+                          },
+                        ),
+                        foregroundColor: WidgetStateProperty.resolveWith<Color>(
+                          (Set<WidgetState> states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return _navyColor;
+                            }
+                            return Colors.grey.shade600;
+                          },
+                        ),
+                        side: WidgetStateProperty.all(
                           BorderSide(color: Colors.grey.shade300),
                         ),
                       ),
@@ -341,7 +337,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         ),
                       ),
                     ),
-                    // 🔹 Status Badge
+
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -586,8 +582,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   zoomControlsEnabled: false,
                   mapToolbarEnabled: false,
                   myLocationEnabled: false,
-                  scrollGesturesEnabled:
-                      false, // 🔹 Disable scrolling so it doesn't mess with ListView
+                  scrollGesturesEnabled: false,
                 ),
               ),
             ),
