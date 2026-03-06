@@ -4,7 +4,6 @@ import '../services/notification_service.dart';
 import '../services/auth_services.dart';
 import 'report_detail_page.dart';
 
-// 🔹 Navy color to match your app's theme from the previous file
 const Color _navyColor = Color(0xFF162447);
 
 void showNotificationModal(BuildContext context) {
@@ -22,7 +21,6 @@ void showNotificationModal(BuildContext context) {
   );
 }
 
-// 🔹 EXTRACTED WIDGET: Keeps context safe and code modular
 class _NotificationSheet extends StatelessWidget {
   const _NotificationSheet();
 
@@ -175,7 +173,6 @@ class _NotificationSheet extends StatelessWidget {
     );
   }
 
-  // 🔹 Separated logic for cleaner UI code
   Future<void> _handleNotificationTap(
     BuildContext context,
     String docId,

@@ -26,7 +26,6 @@ class HomeHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 🔹 Greeting & Name
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,7 +54,6 @@ class HomeHeader extends StatelessWidget {
             ),
           ),
 
-          // 🔹 Avatar Profile
           Container(
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(

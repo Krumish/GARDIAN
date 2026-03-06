@@ -50,7 +50,6 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
         return _triggerError("No drainage infrastructure detected.");
       }
 
-      // 🔹 FIX 2: Standard empty check for Potholes/Manholes
       if (allBoxes.isEmpty) {
         return _triggerError(
           "No ${widget.issueType.toLowerCase()} anomalies detected.\nPlease upload a clearer image or try a different angle.",
@@ -121,7 +120,6 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🔹 Error Icon Container
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -155,7 +153,6 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
                 ),
                 const SizedBox(height: 40),
 
-                // 🔹 Action Buttons
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -216,7 +213,6 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 🔹 Custom Loading Animation Layout
             Stack(
               alignment: Alignment.center,
               children: [

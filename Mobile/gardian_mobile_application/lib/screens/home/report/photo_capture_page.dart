@@ -5,13 +5,13 @@ import 'location_page.dart';
 class PhotoCapturePage extends StatefulWidget {
   final File imageFile;
   final String issueType;
-  final bool requiresAI; // 🔹 Added flag to receive from PhotoSelectionPage
+  final bool requiresAI; 
 
   const PhotoCapturePage({
     super.key,
     required this.imageFile,
     required this.issueType,
-    required this.requiresAI, // 🔹 Make it required
+    required this.requiresAI, 
   });
 
   @override
@@ -55,7 +55,7 @@ class _PhotoCapturePageState extends State<PhotoCapturePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔹 Issue Label Chip
+            
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -83,7 +83,7 @@ class _PhotoCapturePageState extends State<PhotoCapturePage> {
             ),
             const SizedBox(height: 20),
 
-            // 🔹 Image Preview with "Clean" Border
+            
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -109,7 +109,7 @@ class _PhotoCapturePageState extends State<PhotoCapturePage> {
 
             const SizedBox(height: 24),
 
-            // 🔹 Action Buttons
+            
             Row(
               children: [
                 // Retake Button
@@ -144,7 +144,7 @@ class _PhotoCapturePageState extends State<PhotoCapturePage> {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green, // 🔹 Consistent Green
+                      backgroundColor: Colors.green, 
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 18),

@@ -118,7 +118,7 @@ class _LocationPageState extends State<LocationPage> {
 
   @override
   Widget build(BuildContext context) {
-    const navyColor = Color(0xFF162447); // 🔹 Updated to new global theme
+    const navyColor = Color(0xFF162447);
 
     return Scaffold(
       appBar: AppBar(

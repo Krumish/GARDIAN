@@ -295,7 +295,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     enabled: _isEditing,
                   ),
 
-                  // 🔹 CHANGE PASSWORD BUTTON (Replaces Field)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 15),
                     child: OutlinedButton.icon(

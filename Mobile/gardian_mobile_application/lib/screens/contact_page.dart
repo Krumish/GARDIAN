@@ -6,7 +6,7 @@ class ContactPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Matched ProfilePage background
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,7 +123,6 @@ class ContactPage extends StatelessWidget {
     );
   }
 
-  // 🔹 Helper widget for contact info cards
   Widget _buildContactCard({
     required IconData icon,
     required String title,
@@ -136,19 +135,13 @@ class ContactPage extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50, // Matched ProfilePage input fill color
+          color: Colors.grey.shade50,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.shade300,
-          ), // Matched ProfilePage border
+          border: Border.all(color: Colors.grey.shade300),
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: Colors.grey,
-              size: 28,
-            ), // Matched ProfilePage prefixIcon style
+            Icon(icon, color: Colors.grey, size: 28),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

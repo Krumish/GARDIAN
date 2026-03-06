@@ -18,11 +18,9 @@ class CustomDrawer extends StatelessWidget {
 
     return Drawer(
       child: Container(
-        // 🔹 Unified the dark blue color to match your Auth pages
         color: const Color(0xFF162447),
         child: Column(
           children: [
-            // 🔹 Custom, modern Header instead of the default UserAccountsDrawerHeader
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(
@@ -83,7 +81,6 @@ class CustomDrawer extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // 🔹 Scrollable Menu Items
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -145,7 +142,6 @@ class CustomDrawer extends StatelessWidget {
     );
   }
 
-  // 🔹 Passed BuildContext so we can pop the drawer on tap
   Widget _drawerItem(
     BuildContext context,
     IconData icon,
@@ -155,7 +151,6 @@ class CustomDrawer extends StatelessWidget {
     bool isSelected = selectedIndex == index;
 
     return Padding(
-      // 🔹 Added horizontal padding for the modern "floating pill" look
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

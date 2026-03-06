@@ -41,7 +41,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
       });
 
       if (mounted) {
-        // 🔹 CLEAR FIELDS HERE
         setState(() {
           _feedbackController.clear();
           _selectedCategory = null;
@@ -57,7 +56,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
           ),
         );
 
-        // 🔹 Navigate back if possible
         if (Navigator.canPop(context)) {
           // Add a small delay so the user sees the field clear before the page closes
           Future.delayed(const Duration(milliseconds: 500), () {
@@ -111,7 +109,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
               ),
               const SizedBox(height: 25),
 
-              // 🔹 Category Dropdown
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
                 decoration: InputDecoration(
@@ -139,7 +136,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
               const SizedBox(height: 20),
 
-              // 🔹 Feedback Text Box
               TextFormField(
                 controller: _feedbackController,
                 maxLines: 6,
@@ -166,7 +162,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
               const SizedBox(height: 30),
 
-              // 🔹 Submit Button
               SizedBox(
                 width: double.infinity,
                 height: 55,

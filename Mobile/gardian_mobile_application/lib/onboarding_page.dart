@@ -14,7 +14,7 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _controller = PageController();
   int current = 0;
-  bool _isLoading = false; // 🔹 Added loading state
+  bool _isLoading = false; 
 
   final pages = [
     const _Page(
@@ -76,7 +76,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      // 🔹 Added an AppBar just for the Skip button
+      
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -112,7 +112,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
 
-            // 🔹 Dot Indicators
+            
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -125,7 +125,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   decoration: BoxDecoration(
                     color: current == i
                         ? const Color(0xFF162447)
-                        : Colors.grey[300], // 🔹 Updated color
+                        : Colors.grey[300], 
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
@@ -134,7 +134,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
             const SizedBox(height: 24),
 
-            // 🔹 Next / Get Started Button
+            
             SizedBox(
               width:
                   160, // Slightly wider to accommodate loading spinner safely

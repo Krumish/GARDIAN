@@ -117,7 +117,6 @@ class AboutPage extends StatelessWidget {
     );
   }
 
-  // 🔹 Helper Widget to keep the developer list clean
   Widget _buildDeveloperCard(String name) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

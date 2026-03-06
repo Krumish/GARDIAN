@@ -30,8 +30,8 @@ class FirestoreService {
     await _db.collection("users").doc(uid).set({
       "email": email,
       "phone": phone,
-      "firstName": _capitalizeName(firstName), // 🔹 Applied capitalization
-      "lastName": _capitalizeName(lastName), // 🔹 Applied capitalization
+      "firstName": _capitalizeName(firstName),
+      "lastName": _capitalizeName(lastName),
       "barangay": barangay,
       "role": role,
       "createdAt": FieldValue.serverTimestamp(),

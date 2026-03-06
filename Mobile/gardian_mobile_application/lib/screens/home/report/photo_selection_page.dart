@@ -6,12 +6,12 @@ import 'photo_capture_page.dart';
 
 class PhotoSelectionPage extends StatefulWidget {
   final String issueType;
-  final bool requiresAI; // 🔹 Added flag to receive from IssueTypeSelectionPage
+  final bool requiresAI;
 
   const PhotoSelectionPage({
     super.key,
     required this.issueType,
-    required this.requiresAI, // 🔹 Make it required
+    required this.requiresAI,
   });
 
   @override
@@ -20,9 +20,7 @@ class PhotoSelectionPage extends StatefulWidget {
 
 class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
   final ImagePicker _picker = ImagePicker();
-  final Color _navyColor = const Color(
-    0xFF162447,
-  ); // 🔹 Updated to new global theme
+  final Color _navyColor = const Color(0xFF162447);
 
   Future<File> _saveToDocuments(XFile xfile) async {
     final directory = await getApplicationDocumentsDirectory();
@@ -49,8 +47,7 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
           builder: (_) => PhotoCapturePage(
             imageFile: permanentFile,
             issueType: widget.issueType,
-            requiresAI:
-                widget.requiresAI, // 🔹 Pass the flag forward to the next page!
+            requiresAI: widget.requiresAI,
           ),
         ),
       );
@@ -60,7 +57,7 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50, // 🔹 Softer background to match app
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text(
           "Report ${widget.issueType}",
@@ -100,7 +97,6 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
             ),
             const Spacer(),
 
-            // 🔹 Action Card: Take Photo
             _buildSelectionCard(
               title: "Take a New Photo",
               subtitle: "Use your camera to capture the issue now",
@@ -111,7 +107,6 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
 
             const SizedBox(height: 20),
 
-            // 🔹 Action Card: Gallery
             _buildSelectionCard(
               title: "Upload from Gallery",
               subtitle: "Choose an existing photo from your device",
