@@ -18,7 +18,8 @@ def load_models():
     print("Loading YOLO models...")
     models["Drainage"] = YOLO("v5.pt")  
     models["Pothole"] = YOLO("pothole_v2.pt")
-    models["Manhole"] = YOLO("manhole_v1.pt")     
+    models["Manhole"] = YOLO("manhole_v1.pt")
+    models["Road Markings"] = YOLO("marking_v1.pt")    
     print(f"Models loaded: {list(models.keys())}")
 
 def box_area(box):
@@ -38,11 +39,11 @@ SEVERITY_WEIGHTS = {
     "rocks": 1.0, "silt": 0.9, "trash": 0.7, "leaves": 0.4,
 }
 
-# 🔹 ADDED: Strict class filtering dictionary
 EXPECTED_CLASSES = {
     "Drainage": ["drainages", "rocks", "silt", "trash", "leaves"],
     "Pothole": ["pothole", "potholes"], 
-    "Manhole": ["manhole", "manholes"]
+    "Manhole": ["manhole", "manholes", "broken_manhole", "intact_manhole"],
+    "Road Markings": ["crosswalk", "faded_crosswalk", "intact_crosswalk"]
 }
 
 @app.post("/detect/")
@@ -94,8 +95,8 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
 
             # Apply statuses defined in your existing code
             if not drainage_boxes: status = "No Drainage Detected"
-            elif max_blockage_ratio >= 0.6: status = "Clogged"
-            elif max_blockage_ratio >= 0.25: status = "Partially Blocked"
+            elif max_blockage_ratio >= 0.50: status = "Clogged"
+            elif max_blockage_ratio >= 0.10: status = "Partially Blocked"
             else: status = "Clear"
 
             response_data.update({
