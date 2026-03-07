@@ -16,10 +16,10 @@ models = {}
 def load_models():
     global models
     print("Loading YOLO models...")
-    models["Drainage"] = YOLO("v5.pt")  
+    models["Drainage"] = YOLO("drainage_v9.pt")  
     models["Pothole"] = YOLO("pothole_v2.pt")
-    models["Manhole"] = YOLO("manhole_v1.pt")
-    models["Road Markings"] = YOLO("marking_v1.pt")    
+    models["Manhole"] = YOLO("manhole_v2.pt")
+    models["Road Markings"] = YOLO("marking_v2.pt")    
     print(f"Models loaded: {list(models.keys())}")
 
 def box_area(box):
@@ -40,7 +40,7 @@ SEVERITY_WEIGHTS = {
 }
 
 EXPECTED_CLASSES = {
-    "Drainage": ["drainages", "rocks", "silt", "trash", "leaves"],
+    "Drainage": ["drainage", "rocks", "silt", "trash", "leaves"],
     "Pothole": ["pothole", "potholes"], 
     "Manhole": ["manhole", "manholes", "broken_manhole", "intact_manhole"],
     "Road Markings": ["crosswalk", "faded_crosswalk", "intact_crosswalk"]
@@ -83,7 +83,7 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
         }
 
         if issue_type == "Drainage":
-            drainage_boxes = [b["box"] for b in all_boxes if b["class"] == "drainages"]
+            drainage_boxes = [b["box"] for b in all_boxes if b["class"] == "drainage"]
             obstructions = [b for b in all_boxes if b["class"] in SEVERITY_WEIGHTS]
             
             max_blockage_ratio = 0
