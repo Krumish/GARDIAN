@@ -9,7 +9,6 @@ import uuid
 
 app = FastAPI()
 
-# Global dictionary to store loaded models
 models = {}
 
 @app.on_event("startup")
@@ -36,11 +35,11 @@ def overlap_area(box1, box2):
     return 0
 
 SEVERITY_WEIGHTS = {
-    "rocks": 1.0, "silt": 0.9, "trash": 0.7, "leaves": 0.4,
+    "rock": 1.0, "silt": 0.9, "trash": 0.7, "leaf": 0.4, 
 }
 
 EXPECTED_CLASSES = {
-    "Drainage": ["drainage", "rocks", "silt", "trash", "leaves"],
+    "Drainage": ["drainage", "rock", "silt", "trash", "leaf"],
     "Pothole": ["pothole", "potholes"], 
     "Manhole": ["manhole", "manholes", "broken_manhole", "intact_manhole"],
     "Road Markings": ["crosswalk", "faded_crosswalk", "intact_crosswalk"]
@@ -67,8 +66,7 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
         for r in results:
             for box in r.boxes:
                 class_name = r.names[int(box.cls)].lower()
-                
-                # 🔹 FIX: Only append the box if it matches what the user is reporting!
+       
                 if not valid_classes or class_name in valid_classes:
                     all_boxes.append({
                         "class": class_name,
@@ -84,16 +82,27 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
 
         if issue_type == "Drainage":
             drainage_boxes = [b["box"] for b in all_boxes if b["class"] == "drainage"]
-            obstructions = [b for b in all_boxes if b["class"] in SEVERITY_WEIGHTS]
+        
+            all_potential_obs = [b for b in all_boxes if b["class"] in SEVERITY_WEIGHTS]
+       
+            actual_obstructions = []
+            if drainage_boxes:
+                for obs in all_potential_obs:
+                   
+                    if any(overlap_area(obs["box"], dr_box) > 0 for dr_box in drainage_boxes):
+                        actual_obstructions.append(obs)
             
             max_blockage_ratio = 0
             for dr_box in drainage_boxes:
                 dr_area = box_area(dr_box)
-                blocked_area = sum(overlap_area(obs["box"], dr_box) * SEVERITY_WEIGHTS.get(obs["class"], 0.5) for obs in obstructions)
-                ratio = blocked_area / dr_area if dr_area > 0 else 0
+             
+                blocked_area = sum(overlap_area(obs["box"], dr_box) * SEVERITY_WEIGHTS.get(obs["class"], 0.5) for obs in actual_obstructions)
+                
+                raw_ratio = blocked_area / dr_area if dr_area > 0 else 0
+                ratio = min(1.0, raw_ratio) 
                 max_blockage_ratio = max(max_blockage_ratio, ratio)
 
-            # Apply statuses defined in your existing code
+            # Apply statuses
             if not drainage_boxes: status = "No Drainage Detected"
             elif max_blockage_ratio >= 0.50: status = "Clogged"
             elif max_blockage_ratio >= 0.10: status = "Partially Blocked"
@@ -103,10 +112,10 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
                 "status": status,
                 "blockage_percent": round(max_blockage_ratio * 100, 1),
                 "max_blockage_ratio": round(max_blockage_ratio, 3),
-                "drainage": [b for b in all_boxes if b["class"] == "drainages"],
-                "obstructions": obstructions,
+                "drainage": [b for b in all_boxes if b["class"] == "drainage"],
+                "obstructions": actual_obstructions, 
                 "drainage_count": len(drainage_boxes),
-                "obstruction_count": len(obstructions)
+                "obstruction_count": len(actual_obstructions)
             })
         else:
             response_data.update({
