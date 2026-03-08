@@ -47,7 +47,9 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
       final status = results["status"]?.toString() ?? "";
 
       if (widget.issueType == "Drainage" && status == "No Drainage Detected") {
-        return _triggerError("No drainage infrastructure detected.");
+        return _triggerError(
+          "No drainage infrastructure detected.\nPlease upload a clearer image or try a different angle.",
+        );
       }
 
       if (allBoxes.isEmpty) {

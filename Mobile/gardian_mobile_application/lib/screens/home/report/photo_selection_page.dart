@@ -88,7 +88,7 @@ class _PhotoSelectionPageState extends State<PhotoSelectionPage> {
             const SizedBox(height: 12),
 
             Text(
-              "Please provide a clear photo of the ${widget.issueType.toLowerCase()} to help us assess the situation. ${widget.requiresAI ? 'GARDIAN AI will analyze this image instantly.' : 'This report will be sent directly to MENRO for review.'}",
+              "Please provide a clear photo of the ${widget.issueType.toLowerCase()} to help us assess the situation. ${widget.requiresAI ? 'GARDIAN will analyze this image.' : 'This report will be sent directly to MENRO for review.'}",
               style: TextStyle(
                 color: Colors.grey.shade600,
                 fontSize: 16,
