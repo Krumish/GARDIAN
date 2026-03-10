@@ -547,7 +547,7 @@ export default function ResolveReportModal({ report, onClose, onSuccess }) {
                   <p className="text-sm text-red-600">Unable to load admin details</p>
                 )}
                 <p className="text-xs text-blue-700 mt-3 italic">
-                  💡 This information is automatically recorded and cannot be edited.
+                 This information is automatically recorded and cannot be edited.
                 </p>
               </div>
 
