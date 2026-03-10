@@ -335,9 +335,8 @@ export default function ResolveReportModal({ report, onClose, onSuccess }) {
           </div>
         </div>
 
-        {/* Step Content */}
         <div className="p-6">
-          {/* Step 1: Actions Taken with Suggestions */}
+          {/* Actions Taken with Suggestions */}
           {step === 1 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-800">
