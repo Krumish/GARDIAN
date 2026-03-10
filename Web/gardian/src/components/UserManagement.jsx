@@ -54,7 +54,7 @@ export default function UserManagement() {
           id: doc.id,
           ...doc.data(),
         }));
-        // Filter only admin users (any of the three admin roles)
+        // Filter only admin users
         const adminUsers = allUsers.filter(user => ADMIN_ROLES.includes(user.role));
         setUsers(adminUsers);
       },
