@@ -230,7 +230,7 @@ const ReportDetailsModal = ({ selectedReport, onClose, formatDate, formatTime })
                 </div>
               )}
 
-              {/* AI Detection Summary - Drainage Only */}
+              {/* AI Detection Summary */}
               {hasDrainageDetection && (
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6 shadow-sm">
                   <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-5 flex items-center gap-2">
@@ -270,7 +270,7 @@ const ReportDetailsModal = ({ selectedReport, onClose, formatDate, formatTime })
                     </div>
                   </div>
 
-                  {/* AI Confidence Indicator (Optional Enhancement) */}
+                  {/* AI Confidence Indicator */}
                   <div className="mt-5 pt-5 border-t border-blue-200">
                     <p className="text-xs text-gray-600 text-center">
                       Analysis powered by YOLOV8 AI detection system
