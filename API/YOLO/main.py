@@ -19,6 +19,8 @@ def load_models():
     models["Pothole"] = YOLO("pothole_v2.pt")
     models["Manhole"] = YOLO("manhole_v2.pt")
     models["Road Markings"] = YOLO("marking_v2.pt")    
+    models["Road Blockage"] = YOLO("road_block_v1.pt")
+    models["Waste Management"] = YOLO("trash_v1.pt")
     print(f"Models loaded: {list(models.keys())}")
 
 def box_area(box):
@@ -34,6 +36,7 @@ def overlap_area(box1, box2):
         return (ix2 - ix1) * (iy2 - iy1)
     return 0
 
+# SEVERITY WEIGHTS JUSTIFICATION (Hydrological Principles)
 SEVERITY_WEIGHTS = {
     "rock": 1.0, "silt": 0.9, "trash": 0.7, "leaf": 0.4, 
 }
@@ -42,7 +45,9 @@ EXPECTED_CLASSES = {
     "Drainage": ["drainage", "rock", "silt", "trash", "leaf"],
     "Pothole": ["pothole", "potholes"], 
     "Manhole": ["manhole", "manholes", "broken_manhole", "intact_manhole"],
-    "Road Markings": ["crosswalk", "faded_crosswalk", "intact_crosswalk"]
+    "Road Markings": ["crosswalk", "faded_crosswalk", "intact_crosswalk"],
+    "Road Blockage": ["vehicle"],
+    "Waste Management": ["trash"]
 }
 
 @app.post("/detect/")
@@ -57,7 +62,8 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
         with open(temp_name, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        results = model(temp_name)
+        results = model(temp_name, conf=0.25, iou=0.45)
+        
         annotated_image = results[0].plot(conf=False, labels=True, boxes=True)
         
         all_boxes = []
@@ -88,7 +94,6 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
             actual_obstructions = []
             if drainage_boxes:
                 for obs in all_potential_obs:
-                   
                     if any(overlap_area(obs["box"], dr_box) > 0 for dr_box in drainage_boxes):
                         actual_obstructions.append(obs)
             
