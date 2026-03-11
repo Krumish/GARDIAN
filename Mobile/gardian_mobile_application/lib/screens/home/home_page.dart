@@ -13,10 +13,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   Set<String> _activeFilters = {"All"};
 
-  // State variable to control collapse/expand
   bool _isFiltersExpanded = false;
 
-  // Added missing Issue Types and standard Statuses
   final List<String> _typeFilters = [
     "All",
     "Drainage",
@@ -61,6 +59,7 @@ class _HomePageState extends State<HomePage> {
 
           const SizedBox(height: 16),
 
+          // HEADER ROW
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -111,6 +110,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
+          // FILTERS
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 300),
             crossFadeState: _isFiltersExpanded
@@ -170,7 +170,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Helper Widget for clean, reusable filter rows
+  // Helper Widget for filter rows
   Widget _buildFilterRow(String title, List<String> filters) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

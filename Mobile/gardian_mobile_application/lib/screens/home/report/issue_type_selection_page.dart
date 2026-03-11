@@ -35,13 +35,13 @@ class IssueTypeSelectionPage extends StatelessWidget {
       "label": "Waste Management",
       "value": "Waste Management",
       "image": "assets/icons/waste_management.png",
-      "requiresAI": false,
+      "requiresAI": true,
     },
     {
       "label": "Road Blockage",
       "value": "Road Blockage",
       "image": "assets/icons/road_blockage.png",
-      "requiresAI": false,
+      "requiresAI": true,
     },
   ];
 

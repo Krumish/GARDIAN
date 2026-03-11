@@ -32,8 +32,9 @@ class ReportHistory extends StatelessWidget {
         }
 
         final uploads = snapshot.data!.docs.where((doc) {
-          if (selectedFilters.isEmpty || selectedFilters.contains("All"))
+          if (selectedFilters.isEmpty || selectedFilters.contains("All")) {
             return true;
+          }
 
           final data = doc.data() as Map<String, dynamic>;
           final status = data['status'] ?? "Pending";

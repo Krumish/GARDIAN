@@ -176,7 +176,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "AI Analysis Complete",
+                    "Analysis Complete",
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -197,7 +197,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                 ],
               ),
             ),
-
             Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
           ],
         ),
@@ -220,27 +219,36 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     }
 
     // ================= DYNAMIC INTERPRETATION LOGIC =================
-    String interpretation =
-        "The GARDIAN AI analyzed this image for ${widget.issueType.toLowerCase()}-related infrastructure issues. ";
+    String interpretation = "";
 
     if (boxes.isEmpty) {
-      interpretation +=
-          "No relevant anomalies or objects were detected in the frame. The area appears clear.";
+      interpretation =
+          "GARDIAN analyzed this image for ${widget.issueType.toLowerCase()} issues. No anomalies were detected; the area appears clear.";
     } else {
-      interpretation += "The system identified the problem as '$status'. ";
+      interpretation = "Status: $status. ";
 
       // 1. Drainage Logic
       if (widget.issueType == "Drainage" && blockagePercent != null) {
         interpretation +=
-            "Based on the spatial overlap of obstructions against the drainage area, the AI calculated a blockage severity of ${blockagePercent.toStringAsFixed(1)}%. ";
+            "Calculated blockage severity is ${blockagePercent.toStringAsFixed(1)}%. ";
+
+        if (blockagePercent >= 50.0) {
+          interpretation +=
+              "This severe obstruction highly restricts water flow and poses a significant flooding risk.";
+        } else if (blockagePercent >= 10.0) {
+          interpretation +=
+              "Debris is partially restricting water flow, reducing overall drainage efficiency.";
+        } else if (blockagePercent > 0) {
+          interpretation +=
+              "Minor debris detected, but water flow remains largely unaffected.";
+        }
       }
       // 2. Pothole Logic
       else if (widget.issueType == "Pothole") {
-        // Fallback to total boxes if the label is slightly different
         int potholeCount =
             classCounts["pothole"] ?? classCounts["potholes"] ?? boxes.length;
         interpretation +=
-            "The AI detected $potholeCount pothole(s) in the captured area, indicating road surface degradation that requires patching to prevent vehicle damage. ";
+            "Detected $potholeCount pothole(s) requiring patching to prevent vehicle damage.";
       }
       // 3. Manhole Logic
       else if (widget.issueType == "Manhole") {
@@ -249,28 +257,45 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
         if (broken > 0) {
           interpretation +=
-              "Critically, the AI identified $broken broken or damaged manhole cover(s). This poses an immediate safety hazard to vehicles and pedestrians and requires urgent attention. ";
+              "Identified $broken broken manhole(s) posing an immediate safety hazard.";
         } else if (intact > 0) {
           interpretation +=
-              "The detected manhole cover(s) appear to be structurally intact, though the location has been flagged for documentation. ";
+              "Manhole cover(s) appear structurally intact. Flagged for documentation.";
         }
       }
       // 4. Roadmarkings Logic
-      else if (widget.issueType == "Roadmarkings") {
+      else if (widget.issueType == "Road Markings" ||
+          widget.issueType == "Roadmarkings") {
         int faded = classCounts["faded_crosswalk"] ?? 0;
         int intact = classCounts["intact_crosswalk"] ?? 0;
 
         if (faded > 0) {
           interpretation +=
-              "The AI detected $faded faded crosswalk(s) or marking(s), suggesting reduced visibility that compromises pedestrian safety and requires repainting. ";
+              "Detected $faded faded marking(s) requiring repainting to ensure visibility.";
         } else if (intact > 0) {
+          interpretation += "Road markings appear intact and highly visible.";
+        }
+      }
+      // 5. Road Blockage Logic [NEW]
+      else if (widget.issueType == "Road Blockage") {
+        int vehicleCount = classCounts["vehicle"] ?? 0;
+        if (vehicleCount > 0) {
           interpretation +=
-              "The road markings in this area appear intact and highly visible. ";
+              "Detected $vehicleCount vehicle(s) potentially causing an unauthorized road blockage or obstruction.";
+        }
+      }
+      // 6. Waste Management Logic [NEW]
+      else if (widget.issueType == "Waste Management") {
+        int trashCount = classCounts["trash"] ?? 0;
+        if (trashCount > 0) {
+          interpretation +=
+              "Identified $trashCount instance(s) of uncollected waste or illegal dumping requiring cleanup.";
         }
       }
 
+      // Add a concise concluding sentence
       interpretation +=
-          "These findings have been digitally mapped onto the image and will be forwarded to maintenance teams for further review.";
+          " Findings are mapped and ready for maintenance review.";
     }
 
     // ================= UI BUILDER =================
@@ -299,7 +324,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                   Icon(Icons.insights_rounded, color: brandColor, size: 28),
                   const SizedBox(width: 12),
                   const Text(
-                    "AI Analysis Details",
+                    "Analysis Details",
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -348,6 +373,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                       )
                       .join(' ');
 
+                  // Dynamically format the count to show nicely (e.g. "2x Broken Manhole")
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: Row(
@@ -355,7 +381,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                         Icon(Icons.adjust_rounded, color: brandColor, size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          formattedLabel,
+                          "${entry.value}x $formattedLabel",
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,

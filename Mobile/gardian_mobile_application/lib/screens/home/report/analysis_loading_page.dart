@@ -245,7 +245,7 @@ class _AnalysisLoadingPageState extends State<AnalysisLoadingPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              "Applying GARDIAN AI models",
+              "Applying GARDIAN models",
               style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
             ),
           ],
