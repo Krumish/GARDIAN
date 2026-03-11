@@ -210,7 +210,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     final double? blockagePercent = (_yoloResults?["blockage_percent"] as num?)
         ?.toDouble();
 
-    // Group the detected classes to count them (e.g., {"broken_manhole": 1, "intact_manhole": 1})
+    // Group the detected classes to count them
     Map<String, int> classCounts = {};
     for (var box in boxes) {
       // Convert to lowercase to ensure consistency with YOLO labels
@@ -276,7 +276,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
           interpretation += "Road markings appear intact and highly visible.";
         }
       }
-      // 5. Road Blockage Logic [NEW]
+      // 5. Road Blockage Logic
       else if (widget.issueType == "Road Blockage") {
         int vehicleCount = classCounts["vehicle"] ?? 0;
         if (vehicleCount > 0) {
@@ -284,7 +284,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
               "Detected $vehicleCount vehicle(s) potentially causing an unauthorized road blockage or obstruction.";
         }
       }
-      // 6. Waste Management Logic [NEW]
+      // 6. Waste Management Logic
       else if (widget.issueType == "Waste Management") {
         int trashCount = classCounts["trash"] ?? 0;
         if (trashCount > 0) {
@@ -373,7 +373,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                       )
                       .join(' ');
 
-                  // Dynamically format the count to show nicely (e.g. "2x Broken Manhole")
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: Row(
