@@ -41,6 +41,14 @@ export default function ResolveReportModal({ report, onClose, onSuccess }) {
       "Installed reflective markers",
       "Completed full road restriping",
     ],
+    "Road Blockage": [
+      "Repainted road markings",
+      "Restored pedestrian crossing",
+      "Added new lane markings",
+      "Refreshed traffic symbols",
+      "Installed reflective markers",
+      "Completed full road restriping",
+    ],
     "Waste Management": [
       "Cleared overflowing trash",
       "Removed illegal dumping",
