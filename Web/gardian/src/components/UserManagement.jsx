@@ -19,7 +19,7 @@ export default function UserManagement() {
   const personnelAdmins = users.filter(u => u.role === "personnel_admin").length;
   const staffAdmins = users.filter(u => u.role === "staff_admin").length;
   
-  // ✅ Define admin roles (must match Login.jsx)
+  // Define admin roles
   const ADMIN_ROLES = ["super_admin", "personnel_admin", "staff_admin"];
   
   // Add user form
@@ -54,7 +54,7 @@ export default function UserManagement() {
           id: doc.id,
           ...doc.data(),
         }));
-        // Filter only admin users (any of the three admin roles)
+        // Filter only admin users
         const adminUsers = allUsers.filter(user => ADMIN_ROLES.includes(user.role));
         setUsers(adminUsers);
       },
