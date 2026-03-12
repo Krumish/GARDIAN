@@ -255,7 +255,7 @@ function Dashboard({ reports, recentReports }) {
         <MonthlyReportChart reports={reports} />
       </div>
 
-      {/* Recent Reports Table - EXACT FORMAT MATCHING REPORTS.JSX */}
+      {/* Recent Reports Table */}
       <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
         <h2 className="text-lg font-semibold mb-4">Recent Reports</h2>
         
