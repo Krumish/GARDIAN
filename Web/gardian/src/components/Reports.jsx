@@ -284,8 +284,10 @@ const handleExportDOC = () => {
           >
             <option value="">All Types</option>
             <option value="Drainage">Drainage</option>
+            <option value="Pothole">Pothole</option>
+            <option value="Manhole">Manhole</option>
             <option value="Road Markings">Road Markings</option>
-            <option value="Road Surface">Road Surface</option>
+            <option value="Road Blockage">Road Blockage</option>
             <option value="Waste Management">Waste Management</option>
         </select>
 
