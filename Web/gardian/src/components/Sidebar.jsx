@@ -1,10 +1,50 @@
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaHome, FaChartBar, FaChartLine, FaComments, FaSignOutAlt, FaUserCircle, FaUser } from "react-icons/fa";
-import { auth } from "../../firebase";
+import { auth, db } from "../../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch current user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setUserData(userDoc.data());
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+
+    // Listen for auth state changes
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchUserData();
+      } else {
+        setUserData(null);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -16,6 +56,22 @@ export default function Sidebar() {
   };
 
   const isActive = (path) => location.pathname === path;
+
+  // Format role display name
+  const formatRoleName = (role) => {
+    const roleNames = {
+      super_admin: "Super Admin",
+      personnel_admin: "Personnel Admin",
+      staff_admin: "Staff Admin"
+    };
+    return roleNames[role] || "Admin";
+  };
+
+  // Get full name
+  const getDisplayName = () => {
+    if (!userData) return "Admin User";
+    return `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "Admin User";
+  };
 
   const navItems = [
     { path: "/", icon: FaHome, label: "Dashboard" },
@@ -41,9 +97,22 @@ export default function Sidebar() {
           <FaUserCircle className="w-12 h-12 text-blue-400" />
           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
         </div>
-        <div className="flex flex-col">
-          <span className="font-semibold text-white">Admin User</span>
-          <span className="text-xs text-gray-400">Administrator</span>
+        <div className="flex flex-col min-w-0 flex-1">
+          {loading ? (
+            <>
+              <div className="h-4 bg-gray-700 rounded w-24 mb-2 animate-pulse"></div>
+              <div className="h-3 bg-gray-700 rounded w-16 animate-pulse"></div>
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-white truncate" title={getDisplayName()}>
+                {getDisplayName()}
+              </span>
+              <span className="text-xs text-gray-400">
+                {formatRoleName(userData?.role)}
+              </span>
+            </>
+          )}
         </div>
       </div>
 

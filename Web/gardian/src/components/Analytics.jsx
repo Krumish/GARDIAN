@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { collectionGroup, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
-import { FaClock, FaExclamationTriangle, FaUsers } from "react-icons/fa";
+import { FaClock, FaExclamationTriangle, FaUsers, FaExpand, FaTimes } from "react-icons/fa";
 import { FiCheckCircle } from "react-icons/fi";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Line } from "react-chartjs-2";
@@ -9,54 +9,184 @@ import {
   Chart as ChartJS, Title, Tooltip as ChartTooltip, Legend as ChartLegend,
   CategoryScale, LinearScale, PointElement, LineElement,
 } from "chart.js";
-import { MapContainer, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, Circle, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 
 ChartJS.register(Title, ChartTooltip, ChartLegend, CategoryScale, LinearScale, PointElement, LineElement);
 
-// Heatmap Layer
+// Heatmap Layer - Optimized for Cainta, Rizal with zoom-based blending
 function HeatmapLayer({ points }) {
   const map = useMap();
+  const [currentZoom, setCurrentZoom] = useState(14);
+
+  useEffect(() => {
+    if (!map) return;
+
+    const handleZoom = () => {
+      setCurrentZoom(map.getZoom());
+    };
+
+    map.on('zoomend', handleZoom);
+    return () => {
+      map.off('zoomend', handleZoom);
+    };
+  }, [map]);
+
   useEffect(() => {
     if (!map || points.length === 0) return;
+    
+    // Adjust radius and blur based on zoom level
+    const radius = currentZoom < 14 ? 35 : currentZoom < 16 ? 25 : 20;
+    const blur = currentZoom < 14 ? 25 : currentZoom < 16 ? 20 : 15;
+    
+    // Enhanced heatmap with better colors and settings for Cainta
     const heat = L.heatLayer(
       points.map((p) => [p.coords[0], p.coords[1], p.severity]),
-      { radius: 50, blur: 15, maxZoom: 15, gradient: { 0.2: "green", 0.5: "orange", 1.0: "red" } }
+      { 
+        radius: radius,
+        blur: blur,
+        maxZoom: 17,
+        max: 1.0,
+        minOpacity: 0.4,
+        gradient: {
+          0.0: '#00ff00',  // Green - Low
+          0.3: '#ffff00',  // Yellow - Moderate
+          0.5: '#ffa500',  // Orange - High
+          0.7: '#ff4500',  // Orange-red - Very High
+          1.0: '#ff0000'   // Red - Very High
+        }
+      }
     ).addTo(map);
 
+    // Enhanced legend
     const legend = L.control({ position: "bottomright" });
     legend.onAdd = () => {
       const div = L.DomUtil.create("div");
       div.innerHTML = `
-        <div style="background:white;padding:10px;border-radius:8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
-          <div style="font-weight:700;margin-bottom:6px">Severity</div>
-          ${[["green","Low"],["yellow","Moderate"],["orange","High"],["red","Very High"]]
-            .map(([c,l]) => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-              <span style="width:12px;height:12px;background:${c};display:inline-block;border-radius:2px"></span>${l}
-            </div>`).join("")}
+        <div style="background:white;padding:12px;border-radius:10px;font-size:11px;box-shadow:0 4px 12px rgba(0,0,0,0.2);border:1px solid #e5e7eb;z-index:1000;position:relative">
+          <div style="font-weight:700;margin-bottom:8px;font-size:12px;color:#1f2937">Risk Level</div>
+          ${[
+            ["#00ff00", "Low"],
+            ["#ffff00", "Moderate"],
+            ["#ffa500", "High"],
+            ["#ff0000", "Very High"]
+          ].map(([color, label]) => `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+              <span style="width:16px;height:16px;background:${color};display:inline-block;border-radius:3px;border:1px solid rgba(0,0,0,0.1)"></span>
+              <span style="color:#4b5563;font-size:11px">${label}</span>
+            </div>
+          `).join("")}
         </div>`;
       return div;
     };
     legend.addTo(map);
-    return () => { map.removeLayer(heat); legend.remove(); };
-  }, [map, points]);
+
+    return () => { 
+      map.removeLayer(heat); 
+      legend.remove(); 
+    };
+  }, [map, points, currentZoom]);
+  
   return null;
+}
+
+// Report markers with circles - only show when zoomed in
+function ReportMarkers({ points, reports }) {
+  const map = useMap();
+  const [currentZoom, setCurrentZoom] = useState(14);
+
+  useEffect(() => {
+    if (!map) return;
+
+    const handleZoom = () => {
+      setCurrentZoom(map.getZoom());
+    };
+
+    map.on('zoomend', handleZoom);
+    setCurrentZoom(map.getZoom());
+    
+    return () => {
+      map.off('zoomend', handleZoom);
+    };
+  }, [map]);
+
+  // Only show markers when zoomed in enough (zoom level 15 or higher)
+  if (currentZoom < 15) return null;
+
+  return (
+    <>
+      {points.map((point, idx) => {
+        const report = reports[idx];
+        const color = point.severity >= 0.8 ? '#ef4444' : 
+                      point.severity >= 0.6 ? '#f97316' : 
+                      point.severity >= 0.4 ? '#fbbf24' : '#10b981';
+        
+        return (
+          <Circle
+            key={idx}
+            center={point.coords}
+            radius={15}
+            pathOptions={{
+              fillColor: color,
+              fillOpacity: 0.6,
+              color: color,
+              weight: 2
+            }}
+          >
+            <Popup>
+              <div style={{ minWidth: '180px' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '13px' }}>
+                  {report?.issueType || 'Unknown'}
+                </div>
+                <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                  <div>Status: <span style={{ fontWeight: '600' }}>{report?.status}</span></div>
+                  <div>Location: {report?.address || 'N/A'}</div>
+                  {report?.blockagePercent && (
+                    <div>Blockage: {report.blockagePercent}%</div>
+                  )}
+                </div>
+              </div>
+            </Popup>
+          </Circle>
+        );
+      })}
+    </>
+  );
+}
+
+// HighRisk
+function isHighRisk(report) {
+  switch (report.issueType) {
+    case "Drainage":
+      return (report.blockagePercent || 0) >= 75;
+    case "Manhole":
+      return true;
+    case "Pothole":
+      return (report.severity === "Severe" || report.depth >= 10);
+    case "Road Blockage":
+      return true;
+    case "Waste Management":
+      return report.severity === "Severe";
+    default:
+      return false;
+  }
 }
 
 function getSeverity(r) {
   if (r.issueType === "Drainage") {
     const bp = r.blockagePercent || 0;
-    if (bp >= 75) return 1.0;
-    if (bp >= 50) return 0.7;
-    if (bp >= 25) return 0.4;
-    return 0.2;
+    if (bp >= 75) return 1.0;  // Very High
+    if (bp >= 50) return 0.7;  // High
+    if (bp >= 25) return 0.4;  // Moderate
+    return 0.2;  // Low
   }
-  if (r.issueType === "Manhole") return 0.8;
-  if (r.issueType === "Pothole") return 0.6;
-  if (r.issueType === "Waste Management") return 0.5;
-  return 0.3;
+  if (r.issueType === "Manhole") return 0.9;  // Very High
+  if (r.issueType === "Road Blockage") return 0.85;  // Very High
+  if (r.issueType === "Pothole") return 0.6;  // High
+  if (r.issueType === "Waste Management") return 0.5;  // Moderate
+  return 0.3;  // Low
 }
 
 function avgResolutionDays(reports) {
@@ -78,6 +208,7 @@ export default function Analytics() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -112,10 +243,8 @@ export default function Analytics() {
   const totalCount     = reports.length;
 
   const highRiskCount = useMemo(() =>
-    reports.filter((r) =>
-      (r.issueType === "Drainage" && (r.blockagePercent || 0) >= 75) ||
-      r.issueType === "Manhole"
-    ).length, [reports]);
+    reports.filter((r) => isHighRisk(r)).length,
+  [reports]);
 
   const uniqueUsers = useMemo(() =>
     new Set(reports.map((r) => r.userId).filter(Boolean)).size,
@@ -123,12 +252,15 @@ export default function Analytics() {
 
   const resolutionDays = useMemo(() => avgResolutionDays(reports), [reports]);
 
-  // Heatmap points
-  const heatmapPoints = useMemo(() =>
-    reports
-      .filter((r) => r.latitude && r.longitude)
-      .map((r) => ({ coords: [r.latitude, r.longitude], severity: getSeverity(r) })),
-    [reports]);
+  // Heatmap points with report data
+  const { heatmapPoints, reportsWithLocation } = useMemo(() => {
+    const withLocation = reports.filter((r) => r.latitude && r.longitude);
+    const points = withLocation.map((r) => ({ 
+      coords: [r.latitude, r.longitude], 
+      severity: getSeverity(r) 
+    }));
+    return { heatmapPoints: points, reportsWithLocation: withLocation };
+  }, [reports]);
 
   // Issue trend line chart
   const issueTrendData = useMemo(() => {
@@ -199,10 +331,6 @@ export default function Analytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Analytics</h1>
-        <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1 rounded-full font-medium">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
-          Live · {totalCount} total reports
-        </div>
       </div>
 
       {/* Summary Cards */}
@@ -243,18 +371,33 @@ export default function Analytics() {
 
       {/* Heatmap */}
       <div className="bg-white p-6 rounded-xl shadow">
-        <h2 className="text-lg font-semibold mb-4">Heatmap of Problem Areas</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">Heatmap of Problem Areas</h2>
+            <p className="text-xs text-gray-500 mt-1">Cainta, Rizal · {heatmapPoints.length} locations mapped</p>
+          </div>
+          <button
+            onClick={() => setIsMapExpanded(true)}
+            className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition text-sm"
+          >
+            <FaExpand /> Expand Map
+          </button>
+        </div>
+        
         {heatmapPoints.length > 0 ? (
           <MapContainer
-            center={[14.5885, 121.115]}
-            zoom={13}
-            style={{ height: "400px", width: "100%", borderRadius: "12px" }}
+            center={[14.585, 121.115]}
+            zoom={14}
+            style={{ height: "450px", width: "100%", borderRadius: "12px" }}
+            scrollWheelZoom={true}
+            zoomControl={true}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/">OSM</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <HeatmapLayer points={heatmapPoints} />
+            <ReportMarkers points={heatmapPoints} reports={reportsWithLocation} />
           </MapContainer>
         ) : (
           <div className="h-96 flex flex-col items-center justify-center text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
@@ -269,6 +412,42 @@ export default function Analytics() {
           </div>
         )}
       </div>
+
+      {/* Expanded Map Modal */}
+      {isMapExpanded && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+          <div className="bg-white rounded-xl w-full h-full max-w-7xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b bg-white relative" style={{ zIndex: 10000 }}>
+              <div>
+                <h3 className="text-xl font-bold">Cainta Problem Areas Heatmap</h3>
+                <p className="text-sm text-gray-500">{heatmapPoints.length} locations · Real-time data</p>
+              </div>
+              <button
+                onClick={() => setIsMapExpanded(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <FaTimes className="text-xl text-gray-600" />
+              </button>
+            </div>
+            <div className="flex-1 relative" style={{ zIndex: 1 }}>
+              <MapContainer
+                center={[14.585, 121.115]}
+                zoom={14}
+                style={{ height: "100%", width: "100%", position: "relative", zIndex: 1 }}
+                scrollWheelZoom={true}
+                zoomControl={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/">OSM</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <HeatmapLayer points={heatmapPoints} />
+                <ReportMarkers points={heatmapPoints} reports={reportsWithLocation} />
+              </MapContainer>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

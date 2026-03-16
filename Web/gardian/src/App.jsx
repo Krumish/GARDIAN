@@ -17,7 +17,7 @@ import UserManagement from "./components/UserManagement";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 // Icons
-import { FaHistory, FaUsers, FaCheckCircle, FaMapMarkerAlt, FaUser } from "react-icons/fa"; // Added FaUser, FaMapMarkerAlt
+import { FaHistory, FaUsers, FaCheckCircle, FaMapMarkerAlt, FaUser } from "react-icons/fa";
 import { TbReportOff } from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
 import { MdPending } from "react-icons/md";
