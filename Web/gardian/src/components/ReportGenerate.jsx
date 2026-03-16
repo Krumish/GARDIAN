@@ -1,6 +1,16 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+// Generate reference code (same as in Reports.jsx)
+const generateRefCode = (report) => {
+  if (!report || !report.id) return "REF-00000000-XXXXX";
+  const ts = report.uploadedAt;
+  const dateObj = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+  const dateStr = dateObj && !isNaN(dateObj) ? dateObj.toISOString().slice(0, 10).replace(/-/g, "") : "00000000";
+  const shortHash = report.id.slice(-5).toUpperCase();
+  return `REF-${dateStr}-${shortHash}`;
+};
+
 // Add header to PDF
 export const addHeader = (doc, start, end) => {
   // === LOAD IMAGES ===
@@ -182,7 +192,8 @@ export const generatePDF = (reports, startDate, endDate) => {
     startY: 58,
     theme: "striped",
     headStyles: { fillColor: [59, 130, 246] },
-    didDrawPage: () => {
+    margin: { top: 56, bottom: 25 }, // Add top margin to prevent overlap
+    didDrawPage: (data) => {
       addHeader(doc, start, end);
       addFooter(doc);
     }
@@ -190,7 +201,7 @@ export const generatePDF = (reports, startDate, endDate) => {
 
   // Detailed reports table
   const tableData = filtered.map((r) => [
-    r.id.substring(0, 8) + "...",
+    generateRefCode(r), // Use reference code instead of ID
     `${r.userDetails?.firstName || ""} ${r.userDetails?.lastName || ""}`.trim() || "-",
     getInfrastructureType(r),
     r.userDetails?.barangay || "-",
@@ -200,13 +211,14 @@ export const generatePDF = (reports, startDate, endDate) => {
   ]);
 
   autoTable(doc, {
-    head: [["ID", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
+    head: [["Reference Number", "Reporter", "Type", "Barangay", "Status", "Date", "Time"]],
     body: tableData,
     startY: doc.lastAutoTable.finalY + 10,
     theme: "grid",
     headStyles: { fillColor: [59, 130, 246] },
     styles: { fontSize: 8 },
-    didDrawPage: () => {
+    margin: { top: 56, bottom: 25 }, // Add top margin to prevent overlap
+    didDrawPage: (data) => {
       addHeader(doc, start, end);
       addFooter(doc);
     },
@@ -239,7 +251,7 @@ export const generateCSV = (reports, startDate, endDate) => {
 
   // CSV Header
   const headers = [
-    "Report ID",
+    "Reference Number",
     "First Name",
     "Last Name",
     "Type",
@@ -254,7 +266,7 @@ export const generateCSV = (reports, startDate, endDate) => {
 
   // CSV Rows
   const rows = filtered.map((r) => [
-    r.id,
+    generateRefCode(r), // Use reference code instead of ID
     r.userDetails?.firstName || "-",
     r.userDetails?.lastName || "-",
     getInfrastructureType(r),
@@ -297,8 +309,25 @@ export const generateCSV = (reports, startDate, endDate) => {
   document.body.removeChild(link);
 };
 
-// Export as DOCX
-export const generateDOCX = (reports, startDate, endDate) => {
+// Convert image to base64
+const getBase64Image = async (url) => {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("Error loading image:", error);
+    return null;
+  }
+};
+
+// Export as DOCX (HTML format that looks exactly like PDF)
+export const generateDOCX = async (reports, startDate, endDate) => {
   // Validation
   if (!startDate || !endDate) {
     alert("Please select a start date and end date before generating the report.");
@@ -322,126 +351,230 @@ export const generateDOCX = (reports, startDate, endDate) => {
     return;
   }
 
-  // Build HTML content for Word document
+  // Load images as base64
+  const caintaSealBase64 = await getBase64Image("/cainta-seal.png");
+  const menroLogoBase64 = await getBase64Image("/menro-logo.png");
+
+  // Build HTML content for Word document (styled exactly like PDF)
   let htmlContent = `
 <!DOCTYPE html>
-<html>
+<html xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns:m="http://schemas.microsoft.com/office/2004/12/omml"
+      xmlns="http://www.w3.org/TR/REC-html40">
 <head>
   <meta charset="utf-8">
+  <meta name="ProgId" content="Word.Document">
+  <meta name="Generator" content="Microsoft Word 15">
+  <meta name="Originator" content="Microsoft Word 15">
   <title>Infrastructure & Environmental Reports Summary</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
   <style>
+    @page Section1 {
+      size: 8.5in 11in;
+      margin: 0.75in 0.5in 0.75in 0.5in;
+      mso-header-margin: 0.5in;
+      mso-footer-margin: 0.5in;
+      mso-header: h1;
+      mso-footer: f1;
+    }
+    
+    div.Section1 { page: Section1; }
+    
     body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      line-height: 1.6;
+      font-family: 'Helvetica', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
     }
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
+    
+    .header-table {
+      width: 100%;
       border-bottom: 2px solid #000;
-      padding-bottom: 20px;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
     }
-    .header h1 {
-      color: #1e40af;
-      margin: 10px 0;
+    
+    .header-logo {
+      width: 24px;
+      height: 24px;
     }
-    .header p {
-      margin: 5px 0;
-      font-size: 12px;
+    
+    .header-text {
+      text-align: center;
+      vertical-align: middle;
     }
-    .date-range {
-      text-align: left;
-      margin: 20px 0;
+    
+    .header-text h1 {
+      margin: 0;
+      padding: 0;
+      font-size: 9pt;
       font-weight: bold;
     }
-    .summary {
-      margin: 30px 0;
+    
+    .header-text h2 {
+      margin: 2px 0;
+      padding: 0;
+      font-size: 8pt;
+      font-weight: normal;
     }
-    .summary h2 {
+    
+    .header-text h3 {
+      margin: 2px 0;
+      padding: 0;
+      font-size: 12pt;
+      font-weight: bold;
+    }
+    
+    .header-text .office {
+      margin: 2px 0;
+      font-size: 9pt;
       color: #1e40af;
-      border-bottom: 1px solid #ccc;
-      padding-bottom: 5px;
+      font-weight: bold;
     }
+    
+    .header-text .address {
+      margin: 2px 0;
+      font-size: 7pt;
+      color: #646464;
+    }
+    
+    .report-title {
+      margin: 20px 0 10px 0;
+      text-align: center;
+      font-size: 11pt;
+      font-weight: bold;
+    }
+    
+    .date-range {
+      margin: 10px 0;
+      font-size: 9pt;
+    }
+    
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 20px 0;
+      margin: 10px 0;
+      font-size: 8pt;
     }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: left;
-      font-size: 11px;
-    }
-    th {
+    
+    .summary-table th {
       background-color: #3b82f6;
       color: white;
+      padding: 10px;
+      text-align: left;
       font-weight: bold;
+      border: 1px solid #2563eb;
     }
-    tr:nth-child(even) {
+    
+    .summary-table td {
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    
+    .summary-table tr:nth-child(even) {
       background-color: #f9fafb;
     }
-    .footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid #ccc;
+    
+    .details-table th {
+      background-color: #3b82f6;
+      color: white;
+      padding: 8px;
+      text-align: left;
+      font-weight: bold;
+      border: 1px solid #2563eb;
+    }
+    
+    .details-table td {
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+    }
+    
+    .footer-text {
+      margin-top: 30px;
+      padding-top: 10px;
+      border-top: 1px solid #000;
+      font-size: 8pt;
+      color: #505050;
       text-align: center;
-      font-size: 10px;
-      color: #666;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <p><strong>REPUBLIC OF THE PHILIPPINES</strong></p>
-    <p>Province of Rizal</p>
-    <h1>MUNICIPALITY OF CAINTA</h1>
-    <p style="color: #1e40af;">OFFICE OF THE MUNICIPAL ENVIRONMENT AND NATURAL RESOURCES (MENRO)</p>
-    <p>Cainta Municipal Hall, Bonifacio Ave, Sto. Domingo, Cainta, Rizal</p>
-  </div>
-
-  <h2 style="text-align: center; color: #1e40af;">INFRASTRUCTURE & ENVIRONMENTAL REPORTS SUMMARY</h2>
-  
-  <div class="date-range">
-    Reporting Period: ${start.toLocaleDateString()} – ${end.toLocaleDateString()}
-  </div>
-
-  <div class="summary">
-    <h2>Summary Statistics</h2>
-    <table>
+  <div class="Section1">
+    <!-- Header with Logos -->
+    <table class="header-table" cellpadding="0" cellspacing="0">
       <tr>
-        <th>Metric</th>
-        <th>Count</th>
-      </tr>
-      <tr>
-        <td>Total Reports</td>
-        <td>${filtered.length}</td>
-      </tr>
-      <tr>
-        <td>Pending</td>
-        <td>${filtered.filter((r) => r.status === "Pending").length}</td>
-      </tr>
-      <tr>
-        <td>Withdrawn</td>
-        <td>${filtered.filter((r) => r.status === "Withdrawn").length}</td>
-      </tr>
-      <tr>
-        <td>Resolved</td>
-        <td>${filtered.filter((r) => r.status === "Resolved").length}</td>
-      </tr>
-      <tr>
-        <td>Drainage Reports</td>
-        <td>${filtered.filter((r) => r.yolo?.drainage_count > 0).length}</td>
+        <td width="70" valign="top">
+          ${caintaSealBase64 ? `<img src="${caintaSealBase64}" width="50" height="50" style="width:50px;height:50px;display:block;" alt="Cainta Seal">` : ''}
+        </td>
+        <td class="header-text">
+          <h1>REPUBLIC OF THE PHILIPPINES</h1>
+          <h2>Province of Rizal</h2>
+          <h3>MUNICIPALITY OF CAINTA</h3>
+          <p class="office">OFFICE OF THE MUNICIPAL ENVIRONMENT AND NATURAL RESOURCES (MENRO)</p>
+          <p class="address">Cainta Municipal Hall, Bonifacio Ave, Sto. Domingo, Cainta, Rizal</p>
+        </td>
+        <td width="70" valign="top" align="right">
+          ${menroLogoBase64 ? `<img src="${menroLogoBase64}" width="50" height="50" style="width:50px;height:50px;display:block;" alt="MENRO Logo">` : ''}
+        </td>
       </tr>
     </table>
-  </div>
 
-  <div class="summary">
-    <h2>Detailed Reports</h2>
-    <table>
+    <!-- Report Title -->
+    <div class="report-title">
+      INFRASTRUCTURE & ENVIRONMENTAL REPORTS SUMMARY
+    </div>
+
+    <!-- Date Range -->
+    <div class="date-range">
+      <strong>Reporting Period:</strong> ${start.toLocaleDateString()} – ${end.toLocaleDateString()}
+    </div>
+
+    <!-- Summary Statistics -->
+    <table class="summary-table">
       <thead>
         <tr>
-          <th>Report ID</th>
+          <th>Metric</th>
+          <th>Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Total Reports</td>
+          <td>${filtered.length}</td>
+        </tr>
+        <tr>
+          <td>Pending</td>
+          <td>${filtered.filter((r) => r.status === "Pending").length}</td>
+        </tr>
+        <tr>
+          <td>Withdrawn</td>
+          <td>${filtered.filter((r) => r.status === "Withdrawn").length}</td>
+        </tr>
+        <tr>
+          <td>Resolved</td>
+          <td>${filtered.filter((r) => r.status === "Resolved").length}</td>
+        </tr>
+        <tr>
+          <td>Drainage Reports</td>
+          <td>${filtered.filter((r) => r.yolo?.drainage_count > 0).length}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Detailed Reports -->
+    <table class="details-table">
+      <thead>
+        <tr>
+          <th>Reference Number</th>
           <th>Reporter</th>
           <th>Type</th>
           <th>Barangay</th>
@@ -457,7 +590,7 @@ export const generateDOCX = (reports, startDate, endDate) => {
   filtered.forEach((r) => {
     htmlContent += `
         <tr>
-          <td>${r.id.substring(0, 12)}...</td>
+          <td>${generateRefCode(r)}</td>
           <td>${r.userDetails?.firstName || ""} ${r.userDetails?.lastName || ""}</td>
           <td>${getInfrastructureType(r)}</td>
           <td>${r.userDetails?.barangay || "-"}</td>
@@ -471,11 +604,12 @@ export const generateDOCX = (reports, startDate, endDate) => {
   htmlContent += `
       </tbody>
     </table>
-  </div>
 
-  <div class="footer">
-    <p>MENRO – Municipality of Cainta | Official Report</p>
-    <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+    <!-- Footer -->
+    <div class="footer-text">
+      <p>MENRO – Municipality of Cainta | Official Report</p>
+      <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+    </div>
   </div>
 </body>
 </html>
@@ -483,7 +617,7 @@ export const generateDOCX = (reports, startDate, endDate) => {
 
   // Create blob and download
   const blob = new Blob([htmlContent], { 
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+    type: "application/msword" 
   });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);

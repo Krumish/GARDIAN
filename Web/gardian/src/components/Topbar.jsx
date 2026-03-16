@@ -8,131 +8,168 @@ export default function Topbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [filter, setFilter] = useState("all"); // all, unread, pending, resolved
+  const [filter, setFilter] = useState("all");
+  const [userData, setUserData] = useState(null);
   const profileRef = useRef(null);
   const notifRef = useRef(null);
   const navigate = useNavigate();
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  // Fetch current user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setUserData(userDoc.data());
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    fetchUserData();
+
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchUserData();
+      } else {
+        setUserData(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Format role display name
+  const formatRoleName = (role) => {
+    const roleNames = {
+      super_admin: "Super Admin",
+      personnel_admin: "Personnel Admin",
+      staff_admin: "Staff Admin"
+    };
+    return roleNames[role] || "Administrator";
+  };
+
+  // Get full name
+  const getDisplayName = () => {
+    if (!userData) return "Admin User";
+    return `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "Admin User";
+  };
+
   // Real-time notifications listener
-useEffect(() => {
-  const uploadsQuery = collectionGroup(db, "uploads");
+  useEffect(() => {
+    const uploadsQuery = collectionGroup(db, "uploads");
 
-  const unsubscribe = onSnapshot(
-    uploadsQuery,
-    async (snapshot) => {
-      // fetch user details only for UNREAD reports
-      const rawData = await Promise.all(
-        snapshot.docs.map(async (uploadDoc) => {
-          const uploadData = uploadDoc.data();
+    const unsubscribe = onSnapshot(
+      uploadsQuery,
+      async (snapshot) => {
+        const rawData = await Promise.all(
+          snapshot.docs.map(async (uploadDoc) => {
+            const uploadData = uploadDoc.data();
 
-          // CRITICAL: Skip reports already marked as read
-          if (uploadData.read === true) return null;
+            if (uploadData.read === true) return null;
 
-          const userId = uploadDoc.ref.parent.parent?.id || "unknown";
-          let userDetails = null;
+            const userId = uploadDoc.ref.parent.parent?.id || "unknown";
+            let userDetails = null;
 
-          try {
-            const userDoc = await getDoc(doc(db, "users", userId));
-            if (userDoc.exists()) userDetails = userDoc.data();
-          } catch (err) {
-            console.error("Error fetching user details:", err);
-          }
+            try {
+              const userDoc = await getDoc(doc(db, "users", userId));
+              if (userDoc.exists()) userDetails = userDoc.data();
+            } catch (err) {
+              console.error("Error fetching user details:", err);
+            }
 
-          const issueType = uploadData.issueType || "Unknown";
-          const yolo = uploadData.yolo || {};
+            const issueType = uploadData.issueType || "Unknown";
+            const yolo = uploadData.yolo || {};
 
-          // Determine severity based on issue type and YOLO data
-          let severity = "low";
-          let drainageStatus = null;
-          let obstructionCount = 0;
+            let severity = "low";
+            let drainageStatus = null;
+            let obstructionCount = 0;
 
-          if (issueType === "Drainage" && yolo.status) {
-            drainageStatus = yolo.status; // "Clear" or "Clogged"
-            obstructionCount = yolo.obstructions?.length || 0;
+            if (issueType === "Drainage" && yolo.status) {
+              drainageStatus = yolo.status;
+              obstructionCount = yolo.obstructions?.length || 0;
 
-            if (drainageStatus === "Clogged" || obstructionCount > 2) {
-              severity = "high";
-            } else if (obstructionCount > 0) {
+              if (drainageStatus === "Clogged" || obstructionCount > 2) {
+                severity = "high";
+              } else if (obstructionCount > 0) {
+                severity = "medium";
+              }
+            } else {
               severity = "medium";
             }
-          } else {
-            // Default medium for other types
-            severity = "medium";
+
+            const fullAddress = uploadData.address || "";
+            const street = fullAddress.split(",")[0] || fullAddress;
+
+            let message = "";
+            let notifType = "new";
+            const currentStatus = uploadData.status || "Pending";
+
+            if (currentStatus === "Pending") {
+              message = `New ${issueType} report at ${street}`;
+              notifType = "new";
+            } else if (currentStatus === "Resolved") {
+              message = `${issueType} issue at ${street} has been resolved`;
+              notifType = "resolved";
+            } else if (currentStatus === "Withdrawn") {
+              message = `${issueType} report at ${street} was withdrawn`;
+              notifType = "withdrawn";
+            } else if (currentStatus === "Under Review") {
+              message = `${issueType} report at ${street} is under review`;
+              notifType = "review";
+            } else if (currentStatus === "In Progress") {
+              message = `${issueType} repair at ${street} is in progress`;
+              notifType = "progress";
+            }
+
+            return {
+              id: uploadDoc.id,
+              userId,
+              userDetails,
+              issueType,
+              street,
+              status: currentStatus,
+              severity,
+              uploadedAt: uploadData.uploadedAt,
+              message,
+              notifType,
+              obstructionCount,
+              drainageStatus,
+              read: false,
+              docRef: uploadDoc.ref,
+            };
+          })
+        );
+
+        const cleanData = rawData.filter((n) => n !== null);
+
+        cleanData.sort((a, b) => {
+          const timeA = a.uploadedAt?.seconds || 0;
+          const timeB = b.uploadedAt?.seconds || 0;
+
+          if (timeB !== timeA) {
+            return timeB - timeA;
           }
 
-          // Extract street from address
-          const fullAddress = uploadData.address || "";
-          const street = fullAddress.split(",")[0] || fullAddress;
+          const severityOrder = { high: 0, medium: 1, low: 2 };
+          return severityOrder[a.severity] - severityOrder[b.severity];
+        });
 
-          // Determine notification message based on status
-          let message = "";
-          let notifType = "new";
-          const currentStatus = uploadData.status || "Pending";
+        setNotifications(cleanData);
+      },
+      (err) => {
+        console.error("Error fetching notifications:", err);
+      }
+    );
 
-          if (currentStatus === "Pending") {
-            message = `New ${issueType} report at ${street}`;
-            notifType = "new";
-          } else if (currentStatus === "Resolved") {
-            message = `${issueType} issue at ${street} has been resolved`;
-            notifType = "resolved";
-          } else if (currentStatus === "Withdrawn") {
-            message = `${issueType} report at ${street} was withdrawn`;
-            notifType = "withdrawn";
-          } else if (currentStatus === "Under Review") {
-            message = `${issueType} report at ${street} is under review`;
-            notifType = "review";
-          } else if (currentStatus === "In Progress") {
-            message = `${issueType} repair at ${street} is in progress`;
-            notifType = "progress";
-          }
-
-          return {
-            id: uploadDoc.id,
-            userId,
-            userDetails,
-            issueType,
-            street,
-            status: currentStatus,
-            severity,
-            uploadedAt: uploadData.uploadedAt,
-            message,
-            notifType,
-            obstructionCount,
-            drainageStatus,
-            read: false, 
-            docRef: uploadDoc.ref,
-          };
-        })
-      );
-
-      // Filter out null entries (the reports that were already read)
-      const cleanData = rawData.filter((n) => n !== null);
-
-      // Sort by uploadedAt (newest first) and then by severity
-      cleanData.sort((a, b) => {
-        const timeA = a.uploadedAt?.seconds || 0;
-        const timeB = b.uploadedAt?.seconds || 0;
-
-        if (timeB !== timeA) {
-          return timeB - timeA;
-        }
-
-        const severityOrder = { high: 0, medium: 1, low: 2 };
-        return severityOrder[a.severity] - severityOrder[b.severity];
-      });
-
-      // Update state
-      setNotifications(cleanData);
-    },
-    (err) => {
-      console.error("Error fetching notifications:", err);
-    }
-  );
-
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -149,12 +186,10 @@ useEffect(() => {
 
   const markAsRead = async (notification) => {
     try {
-      // Update in Firebase
       await updateDoc(notification.docRef, {
         read: true
       });
       
-      // Update local state immediately for better UX
       setNotifications((prev) =>
         prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
       );
@@ -165,14 +200,12 @@ useEffect(() => {
 
   const markAllAsRead = async () => {
     try {
-      // Update all unread notifications in Firebase
       const updatePromises = notifications
         .filter(n => !n.read)
         .map(n => updateDoc(n.docRef, { read: true }));
       
       await Promise.all(updatePromises);
       
-      // Update local state
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch (err) {
       console.error("Error marking all as read:", err);
@@ -182,15 +215,13 @@ useEffect(() => {
   const handleNotificationClick = async (notification) => {
     try {
       await updateDoc(notification.docRef, { read: true });
-
       setIsNotifOpen(false);
       navigate("/reports");
-    
-      } catch (err) {
-          console.error("Error handling notification click:", err);
-     }
-    };
-  // Filter notifications
+    } catch (err) {
+      console.error("Error handling notification click:", err);
+    }
+  };
+
   const filteredNotifications = notifications.filter((n) => {
     if (filter === "unread") return !n.read;
     if (filter === "pending") return n.status === "Pending";
@@ -198,20 +229,20 @@ useEffect(() => {
     return true;
   });
 
-const getSeverityIcon = (severity, status) => {
-  if (status === "Resolved") {
-    return <FaCheckCircle className="text-green-500" />;
-  }
+  const getSeverityIcon = (severity, status) => {
+    if (status === "Resolved") {
+      return <FaCheckCircle className="text-green-500" />;
+    }
 
-  switch (severity) {
-    case "high":
-      return <FaExclamationCircle className="text-red-500" />;
-    case "medium":
-      return <FaExclamationCircle className="text-orange-500" />;
-    default:
-      return <FaClock className="text-gray-500" />;
-  }
-};
+    switch (severity) {
+      case "high":
+        return <FaExclamationCircle className="text-red-500" />;
+      case "medium":
+        return <FaExclamationCircle className="text-orange-500" />;
+      default:
+        return <FaClock className="text-gray-500" />;
+    }
+  };
 
   const getSeverityColor = (severity) => {
     switch (severity) {
@@ -278,7 +309,6 @@ const getSeverityIcon = (severity, status) => {
 
           {isNotifOpen && (
             <div className="absolute right-0 mt-3 w-[420px] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 overflow-hidden animate-fadeIn">
-              {/* Header */}
               <div className="p-4 border-b text-white" style={{background: 'linear-gradient(to right, #111827, #1f2937)'}}>
                 <div className="flex items-center justify-between">
                   <div>
@@ -300,7 +330,6 @@ const getSeverityIcon = (severity, status) => {
                   )}
                 </div>
 
-                {/* Filter Tabs */}
                 <div className="flex gap-2 mt-3">
                   {["all", "unread", "pending", "resolved"].map((f) => (
                     <button
@@ -319,7 +348,6 @@ const getSeverityIcon = (severity, status) => {
                 </div>
               </div>
 
-              {/* Notifications List */}
               <ul className="max-h-[500px] overflow-y-auto">
                 {filteredNotifications.length > 0 ? (
                   filteredNotifications.map((n) => (
@@ -348,7 +376,6 @@ const getSeverityIcon = (severity, status) => {
                             )}
                           </div>
 
-                          {/* Additional Details */}
                           <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
                             <span className="flex items-center gap-1">
                               <FaUserCircle className="text-gray-400" />
@@ -358,7 +385,6 @@ const getSeverityIcon = (severity, status) => {
                             <span>{getTimeAgo(n.uploadedAt)}</span>
                           </div>
 
-                          {/* Severity Badge & Info - Only show for Drainage with YOLO data */}
                           <div className="flex items-center gap-2 mt-2">
                             {n.severity === "high" && (
                               <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">
@@ -393,7 +419,6 @@ const getSeverityIcon = (severity, status) => {
                 )}
               </ul>
 
-              {/* Footer */}
               <div className="p-3 text-center border-t bg-gray-50">
                 <Link
                   to="/reports"
@@ -414,8 +439,8 @@ const getSeverityIcon = (severity, status) => {
         {/* Profile */}
         <div className="flex items-center space-x-3 relative" ref={profileRef}>
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-white">Admin User</p>
-            <p className="text-xs text-gray-400">Administrator</p>
+            <p className="text-sm font-medium text-white">{getDisplayName()}</p>
+            <p className="text-xs text-gray-400">{formatRoleName(userData?.role)}</p>
           </div>
           <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -428,8 +453,9 @@ const getSeverityIcon = (severity, status) => {
           {isProfileOpen && (
             <div className="absolute top-14 right-0 w-56 bg-white rounded-lg shadow-2xl text-gray-800 border border-gray-200 overflow-hidden animate-fadeIn z-50">
               <div className="p-4 text-white" style={{background: 'linear-gradient(to right, #111827, #1f2937)'}}>
-                <p className="font-semibold">Admin User</p>
-                <p className="text-xs text-gray-300 mt-0.5">admin@gmail.com</p>
+                <p className="font-semibold">{getDisplayName()}</p>
+                <p className="text-xs text-gray-300 mt-0.5">{userData?.email || "admin@gmail.com"}</p>
+                <p className="text-xs text-gray-400 mt-1">{formatRoleName(userData?.role)}</p>
               </div>
               <ul className="py-2">
                 <li>
