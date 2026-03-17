@@ -44,7 +44,7 @@ export default function Reports() {
   const totalCount = reports.length;
 
 
-  // Fetch all uploads across all users in real-time
+  // Fetch all uploads across all users
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) {
@@ -96,7 +96,7 @@ export default function Reports() {
     return () => unsubscribe();
   }, []);
 
-  // Determine infrastructure type based on yolo data
+  // Determine infrastructure type
   const getInfrastructureType = (report) => {
   if (report.yolo?.drainage_count > 0) return "Drainage";
   return report.issueType || "Unknown";
@@ -284,8 +284,10 @@ const handleExportDOC = () => {
           >
             <option value="">All Types</option>
             <option value="Drainage">Drainage</option>
+            <option value="Pothole">Pothole</option>
+            <option value="Manhole">Manhole</option>
             <option value="Road Markings">Road Markings</option>
-            <option value="Road Surface">Road Surface</option>
+            <option value="Road Blockage">Road Blockage</option>
             <option value="Waste Management">Waste Management</option>
         </select>
 

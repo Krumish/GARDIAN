@@ -17,7 +17,7 @@ import UserManagement from "./components/UserManagement";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 // Icons
-import { FaHistory, FaUsers, FaCheckCircle, FaMapMarkerAlt, FaUser } from "react-icons/fa"; // Added FaUser, FaMapMarkerAlt
+import { FaHistory, FaUsers, FaCheckCircle, FaMapMarkerAlt, FaUser } from "react-icons/fa";
 import { TbReportOff } from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
 import { MdPending } from "react-icons/md";
@@ -255,7 +255,7 @@ function Dashboard({ reports, recentReports }) {
         <MonthlyReportChart reports={reports} />
       </div>
 
-      {/* Recent Reports Table - EXACT FORMAT MATCHING REPORTS.JSX */}
+      {/* Recent Reports Table */}
       <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
         <h2 className="text-lg font-semibold mb-4">Recent Reports</h2>
         
