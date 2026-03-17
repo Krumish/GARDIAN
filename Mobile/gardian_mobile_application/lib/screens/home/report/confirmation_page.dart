@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../../services/storage_service.dart';
+import '../../../widgets/ai_analysis_modal.dart';
+import '../../../widgets/blockage_assessment_card.dart';
 
 class ConfirmationPage extends StatefulWidget {
   final File imageFile;
@@ -43,20 +45,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     _fetchAddressFromCoordinates();
   }
 
-  // ===================== HELPERS =====================
-
-  String _blockageLabel(double percent) {
-    if (percent >= 50) return "Clogged";
-    if (percent >= 10) return "Partially Blocked";
-    return "Clear";
-  }
-
-  Color _blockageColor(double percent) {
-    if (percent >= 50) return Colors.red;
-    if (percent >= 10) return Colors.orange;
-    return Colors.green;
-  }
-
   // ===================== LOCATION =====================
 
   Future<void> _fetchAddressFromCoordinates() async {
@@ -89,7 +77,9 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
   // ===================== UPLOAD =====================
 
   Future<void> _uploadToFirebase(BuildContext context) async {
-    if (_locationController.text.trim().isEmpty) {
+    final addressText = _locationController.text.trim();
+
+    if (addressText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("⚠️ Please confirm the location/address."),
@@ -97,6 +87,33 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
       );
       return;
     }
+
+    // Check if the address string contains 'cainta'
+    if (!addressText.toLowerCase().contains('cainta')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.location_off_rounded, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "Reports can only be submitted within the area of Cainta.",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+    // ------------------------------------
 
     try {
       setState(() => _uploading = true);
@@ -106,7 +123,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         annotatedImageFile: _annotatedFile,
         lat: widget.selectedCoordinate.latitude,
         lng: widget.selectedCoordinate.longitude,
-        address: _locationController.text.trim(),
+        address: addressText,
         note: _noteController.text.trim(),
         yoloResults: _yoloResults,
         issueType: widget.issueType,
@@ -146,7 +163,15 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
   Widget _buildDetectionSummary(List boxes, Color brandColor) {
     return GestureDetector(
-      onTap: () => _showAIDetailsModal(context, boxes, brandColor),
+      onTap: () {
+        AIAnalysisModal.show(
+          context: context,
+          boxes: boxes,
+          brandColor: brandColor,
+          issueType: widget.issueType,
+          yoloResults: _yoloResults,
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -201,222 +226,6 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
           ],
         ),
       ),
-    );
-  }
-
-  // Modal for AI Analysis Details with specific issue interpretations
-  void _showAIDetailsModal(BuildContext context, List boxes, Color brandColor) {
-    final status = _yoloResults?['status'] ?? 'Detected';
-    final double? blockagePercent = (_yoloResults?["blockage_percent"] as num?)
-        ?.toDouble();
-
-    // Group the detected classes to count them
-    Map<String, int> classCounts = {};
-    for (var box in boxes) {
-      // Convert to lowercase to ensure consistency with YOLO labels
-      String className = (box['class'] ?? 'unknown').toString().toLowerCase();
-      classCounts[className] = (classCounts[className] ?? 0) + 1;
-    }
-
-    // ================= DYNAMIC INTERPRETATION LOGIC =================
-    String interpretation = "";
-
-    if (boxes.isEmpty) {
-      interpretation =
-          "GARDIAN analyzed this image for ${widget.issueType.toLowerCase()} issues. No anomalies were detected; the area appears clear.";
-    } else {
-      interpretation = "Status: $status. ";
-
-      // 1. Drainage Logic
-      if (widget.issueType == "Drainage" && blockagePercent != null) {
-        interpretation +=
-            "Calculated blockage severity is ${blockagePercent.toStringAsFixed(1)}%. ";
-
-        if (blockagePercent >= 50.0) {
-          interpretation +=
-              "This severe obstruction highly restricts water flow and poses a significant flooding risk.";
-        } else if (blockagePercent >= 10.0) {
-          interpretation +=
-              "Debris is partially restricting water flow, reducing overall drainage efficiency.";
-        } else if (blockagePercent > 0) {
-          interpretation +=
-              "Minor debris detected, but water flow remains largely unaffected.";
-        }
-      }
-      // 2. Pothole Logic
-      else if (widget.issueType == "Pothole") {
-        int potholeCount =
-            classCounts["pothole"] ?? classCounts["potholes"] ?? boxes.length;
-        interpretation +=
-            "Detected $potholeCount pothole(s) requiring patching to prevent vehicle damage.";
-      }
-      // 3. Manhole Logic
-      else if (widget.issueType == "Manhole") {
-        int broken = classCounts["broken_manhole"] ?? 0;
-        int intact = classCounts["intact_manhole"] ?? 0;
-
-        if (broken > 0) {
-          interpretation +=
-              "Identified $broken broken manhole(s) posing an immediate safety hazard.";
-        } else if (intact > 0) {
-          interpretation +=
-              "Manhole cover(s) appear structurally intact. Flagged for documentation.";
-        }
-      }
-      // 4. Roadmarkings Logic
-      else if (widget.issueType == "Road Markings" ||
-          widget.issueType == "Roadmarkings") {
-        int faded = classCounts["faded_crosswalk"] ?? 0;
-        int intact = classCounts["intact_crosswalk"] ?? 0;
-
-        if (faded > 0) {
-          interpretation +=
-              "Detected $faded faded marking(s) requiring repainting to ensure visibility.";
-        } else if (intact > 0) {
-          interpretation += "Road markings appear intact and highly visible.";
-        }
-      }
-      // 5. Road Blockage Logic
-      else if (widget.issueType == "Road Blockage") {
-        int vehicleCount = classCounts["vehicle"] ?? 0;
-        if (vehicleCount > 0) {
-          interpretation +=
-              "Detected $vehicleCount vehicle(s) potentially causing an unauthorized road blockage or obstruction.";
-        }
-      }
-      // 6. Waste Management Logic
-      else if (widget.issueType == "Waste Management") {
-        int trashCount = classCounts["trash"] ?? 0;
-        if (trashCount > 0) {
-          interpretation +=
-              "Identified $trashCount instance(s) of uncollected waste or illegal dumping requiring cleanup.";
-        }
-      }
-
-      // Add a concise concluding sentence
-      interpretation +=
-          " Findings are mapped and ready for maintenance review.";
-    }
-
-    // ================= UI BUILDER =================
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: 24,
-            left: 24,
-            right: 24,
-            bottom: MediaQuery.of(context).padding.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Icon(Icons.insights_rounded, color: brandColor, size: 28),
-                  const SizedBox(width: 12),
-                  const Text(
-                    "Analysis Details",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const Divider(height: 32),
-
-              // Interpretation Paragraph
-              const Text(
-                "Report Interpretation",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                interpretation,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // List of Detected Objects
-              const Text(
-                "Detected Objects",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              if (boxes.isEmpty)
-                Text(
-                  "No items detected.",
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontStyle: FontStyle.italic,
-                  ),
-                )
-              else
-                ...classCounts.entries.map((entry) {
-                  // Format the label (e.g., "broken_manhole" -> "Broken Manhole")
-                  String formattedLabel = entry.key
-                      .split('_')
-                      .map(
-                        (word) => word.isNotEmpty
-                            ? '${word[0].toUpperCase()}${word.substring(1)}'
-                            : '',
-                      )
-                      .join(' ');
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: Row(
-                      children: [
-                        Icon(Icons.adjust_rounded, color: brandColor, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          "${entry.value}x $formattedLabel",
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                      ],
-                    ),
-                  );
-                }),
-
-              const SizedBox(height: 32),
-
-              // Close Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: brandColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  child: const Text(
-                    "Close",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -493,7 +302,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
               ),
               const SizedBox(height: 24),
 
-              // ================= DYNAMIC SUMMARY (AI VS MANUAL) =================
+              // ================= DYNAMIC SUMMARY =================
               if (widget.yoloResults != null)
                 _buildDetectionSummary(allBoxes, navyColor)
               else
@@ -501,63 +310,10 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
 
               const SizedBox(height: 16),
 
-              // ================= BLOCKAGE ASSESSMENT (AI Drainage Only) =================
+              // ================= BLOCKAGE ASSESSMENT =================
               if (widget.issueType == "Drainage" &&
                   blockagePercent != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.grey.shade200, width: 1.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Blockage Severity",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: LinearProgressIndicator(
-                                value: blockagePercent / 100,
-                                minHeight: 12,
-                                backgroundColor: Colors.grey.shade200,
-                                color: _blockageColor(blockagePercent),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Text(
-                            "${blockagePercent.toStringAsFixed(1)}%",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: _blockageColor(blockagePercent),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _blockageLabel(blockagePercent),
-                        style: TextStyle(
-                          color: _blockageColor(blockagePercent),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                BlockageAssessmentCard(blockagePercent: blockagePercent),
                 const SizedBox(height: 24),
               ],
 

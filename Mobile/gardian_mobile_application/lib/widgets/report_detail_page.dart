@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import '../services/auth_services.dart';
+import '../widgets/blockage_assessment_card.dart';
+import '../widgets/ai_analysis_modal.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final String reportId;
@@ -30,18 +32,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   void initState() {
     super.initState();
     _currentStatus = widget.data['status'] ?? "Pending";
-  }
-
-  Color _blockageColor(double percent) {
-    if (percent >= 60) return Colors.red.shade600;
-    if (percent >= 25) return Colors.orange.shade600;
-    return Colors.green.shade600;
-  }
-
-  String _blockageLabel(double percent) {
-    if (percent >= 60) return "Clogged";
-    if (percent >= 25) return "Partially Blocked";
-    return "Clear";
   }
 
   Color get _statusColor {
@@ -166,7 +156,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     }
   }
 
-  // Helper function to build modern cards
   Widget _buildCard({required Widget child}) {
     return Container(
       width: double.infinity,
@@ -194,6 +183,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     final address = widget.data['address'] ?? "No address provided";
     final note = widget.data['note'] ?? "";
     final yolo = widget.data['yolo'] as Map<String, dynamic>? ?? {};
+
+    final List<dynamic> boxes = yolo['boxes'] as List<dynamic>? ?? [];
 
     final lat = double.tryParse(widget.data['latitude']?.toString() ?? "");
     final lng = double.tryParse(widget.data['longitude']?.toString() ?? "");
@@ -269,8 +260,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Segmented Button Toggle
-                if (annotatedUrl != null)
+                // Image Toggle & AI Insight Button
+                if (annotatedUrl != null) ...[
                   SizedBox(
                     width: double.infinity,
                     child: SegmentedButton<String>(
@@ -313,6 +304,37 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        AIAnalysisModal.show(
+                          context: context,
+                          boxes: boxes,
+                          brandColor: _navyColor,
+                          issueType: issueType,
+                          yoloResults: yolo,
+                        );
+                      },
+                      icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+                      label: const Text(
+                        "View Analysis",
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo.shade50,
+                        foregroundColor: _navyColor,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(color: Colors.indigo.shade100),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
 
@@ -337,7 +359,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         ),
                       ),
                     ),
-
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -374,7 +395,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Date Row
                 Row(
                   children: [
                     Container(
@@ -402,7 +422,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
                 const SizedBox(height: 12),
 
-                // Location Row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -437,83 +456,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
           const SizedBox(height: 16),
 
-          // --- 📊 BLOCKAGE PERCENTAGE CARD (AI UI) ---
+          // --- 📊 BLOCKAGE PERCENTAGE CARD ---
           if (issueType == "Drainage" && blockagePercent != null) ...[
-            _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.analytics_rounded,
-                        color: _navyColor,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "AI Blockage Assessment",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: _navyColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            Container(
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            FractionallySizedBox(
-                              widthFactor: blockagePercent / 100,
-                              child: Container(
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  color: _blockageColor(blockagePercent),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      SizedBox(
-                        width: 50,
-                        child: Text(
-                          "${blockagePercent.toStringAsFixed(1)}%",
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: _blockageColor(blockagePercent),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Status: ${_blockageLabel(blockagePercent)}",
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            BlockageAssessmentCard(blockagePercent: blockagePercent),
             const SizedBox(height: 16),
           ],
 
