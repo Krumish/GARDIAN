@@ -19,6 +19,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController =
+      TextEditingController(); // 📍 NEW: Controller added
 
   // Dropdown state
   String? _selectedBarangay;
@@ -62,10 +64,22 @@ class _RegisterPageState extends State<RegisterPage> {
         _lastNameController.text.trim().isEmpty ||
         _emailController.text.trim().isEmpty ||
         _phoneController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
+        _passwordController.text.trim().isEmpty ||
+        _confirmPasswordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Please fill in all fields"),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Passwords do not match"),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -97,7 +111,8 @@ class _RegisterPageState extends State<RegisterPage> {
             builder: (_) => OtpPage(
               verificationId: verificationId,
               email: _emailController.text.trim(),
-              password: _passwordController.text.trim(),
+              password: _passwordController.text
+                  .trim(), // Note: OTP page handles actual registration, so we only need to pass the real password
               firstName: _firstNameController.text.trim(),
               lastName: _lastNameController.text.trim(),
               barangay: _selectedBarangay!,
@@ -239,6 +254,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       CustomTextField(
                         controller: _passwordController,
                         hintText: "Create password",
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 12),
+
+                      CustomTextField(
+                        controller: _confirmPasswordController,
+                        hintText: "Confirm password",
                         obscureText: true,
                       ),
 
