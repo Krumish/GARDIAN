@@ -14,6 +14,12 @@ class IssueTypeSelectionPage extends StatelessWidget {
       "requiresAI": true,
     },
     {
+      "label": "Waste Management",
+      "value": "Waste Management",
+      "image": "assets/icons/waste_management.png",
+      "requiresAI": true,
+    },
+    {
       "label": "Manhole",
       "value": "Manhole",
       "image": "assets/icons/manhole.png",
@@ -29,12 +35,6 @@ class IssueTypeSelectionPage extends StatelessWidget {
       "label": "Road Markings",
       "value": "Road Markings",
       "image": "assets/icons/road_markings.png",
-      "requiresAI": true,
-    },
-    {
-      "label": "Waste Management",
-      "value": "Waste Management",
-      "image": "assets/icons/waste_management.png",
       "requiresAI": true,
     },
     {
