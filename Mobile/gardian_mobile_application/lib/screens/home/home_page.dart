@@ -24,7 +24,12 @@ class _HomePageState extends State<HomePage> {
     "Waste Management",
     "Road Blockage",
   ];
-  final List<String> _statusFilters = ["Pending", "Resolved", "Withdrawn"];
+  final List<String> _statusFilters = [
+    "Pending",
+    "Assigned",
+    "Resolved",
+    "Withdrawn",
+  ];
 
   final Color navyColor = const Color(0xFF162447);
 

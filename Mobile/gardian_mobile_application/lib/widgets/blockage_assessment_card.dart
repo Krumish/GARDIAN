@@ -5,7 +5,7 @@ class BlockageAssessmentCard extends StatelessWidget {
 
   const BlockageAssessmentCard({super.key, required this.blockagePercent});
 
-  // Keep the logic tied to the widget that actually uses it
+  
   String _blockageLabel(double percent) {
     if (percent >= 50) return "Clogged";
     if (percent >= 10) return "Partially Blocked";

@@ -28,29 +28,50 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
   final Color _navyColor = const Color(0xFF122D5A);
 
+  final List<String> _withdrawReasons = [
+    "Issue was already resolved",
+    "Reported by mistake",
+    "Duplicate report",
+    "No longer an issue",
+    "Other",
+  ];
+
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.data['status'] ?? "Pending";
   }
 
+  // 📍 UPDATED: Added "Assigned" color logic
   Color get _statusColor {
     if (_currentStatus == "Resolved") return Colors.green.shade600;
     if (_currentStatus == "Withdrawn") return Colors.grey.shade600;
+    if (_currentStatus == "Assigned") return Colors.indigo.shade600;
     return Colors.orange.shade600; // Pending
   }
 
+  // 📍 UPDATED: Added "Assigned" icon logic
   IconData get _statusIcon {
     if (_currentStatus == "Resolved") return Icons.check_circle_rounded;
     if (_currentStatus == "Withdrawn") return Icons.cancel_rounded;
+    if (_currentStatus == "Assigned") return Icons.assignment_ind_rounded;
     return Icons.access_time_filled_rounded; // Pending
   }
 
   Future<void> _withdrawReport() async {
-    bool confirm =
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
+    String? selectedReason;
+    final TextEditingController otherReasonController = TextEditingController();
+
+    String? finalReason = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          bool isButtonDisabled =
+              selectedReason == null ||
+              (selectedReason == "Other" &&
+                  otherReasonController.text.trim().isEmpty);
+
+          return AlertDialog(
             backgroundColor: Colors.white,
             title: const Row(
               children: [
@@ -66,9 +87,75 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
               ],
             ),
-            content: Text(
-              "Are you sure you want to withdraw this report? This action cannot be undone.",
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Are you sure you want to withdraw this report? Please select a reason below.",
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+
+                DropdownButtonFormField<String>(
+                  value: selectedReason,
+                  hint: const Text("Select a reason"),
+                  dropdownColor: Colors.white,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  items: _withdrawReasons.map((String reason) {
+                    return DropdownMenuItem<String>(
+                      value: reason,
+                      child: Text(reason, style: const TextStyle(fontSize: 14)),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setStateDialog(() {
+                      selectedReason = newValue;
+                      if (newValue != "Other") {
+                        otherReasonController.clear();
+                      }
+                    });
+                  },
+                ),
+
+                if (selectedReason == "Other") ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: otherReasonController,
+                    maxLines: 3,
+                    minLines: 1,
+                    decoration: InputDecoration(
+                      hintText: "Please specify your reason...",
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 14,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Colors.redAccent),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setStateDialog(() {});
+                    },
+                  ),
+                ],
+              ],
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -76,7 +163,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             actionsPadding: const EdgeInsets.only(bottom: 16, right: 16),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
+                onPressed: () => Navigator.pop(context, null),
                 child: Text(
                   "Cancel",
                   style: TextStyle(
@@ -87,7 +174,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
+                  backgroundColor: isButtonDisabled
+                      ? Colors.grey.shade300
+                      : Colors.redAccent,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -97,21 +186,31 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     vertical: 10,
                   ),
                 ),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text(
+                onPressed: isButtonDisabled
+                    ? null
+                    : () {
+                        String reasonToSubmit = selectedReason == "Other"
+                            ? "Other: ${otherReasonController.text.trim()}"
+                            : selectedReason!;
+                        Navigator.pop(context, reasonToSubmit);
+                      },
+                child: Text(
                   "Withdraw",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: isButtonDisabled
+                        ? Colors.grey.shade500
+                        : Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
-          ),
-        ) ??
-        false;
+          );
+        },
+      ),
+    );
 
-    if (!confirm) return;
+    if (finalReason == null) return;
 
     setState(() => _isWithdrawing = true);
     try {
@@ -123,7 +222,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           .doc(uid)
           .collection('uploads')
           .doc(widget.reportId)
-          .update({'status': 'Withdrawn'});
+          .update({
+            'status': 'Withdrawn',
+            'withdrawReason': finalReason,
+            'withdrawnAt': FieldValue.serverTimestamp(),
+          });
 
       setState(() {
         _currentStatus = 'Withdrawn';
@@ -260,7 +363,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Image Toggle & AI Insight Button
                 if (annotatedUrl != null) ...[
                   SizedBox(
                     width: double.infinity,
@@ -273,7 +375,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         ),
                         ButtonSegment(
                           value: 'Annotated',
-                          label: Text('AI Annotated'),
+                          label: Text('Results View'),
                           icon: Icon(Icons.analytics_rounded),
                         ),
                       ],
@@ -456,13 +558,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
           const SizedBox(height: 16),
 
-          // --- 📊 BLOCKAGE PERCENTAGE CARD ---
           if (issueType == "Drainage" && blockagePercent != null) ...[
             BlockageAssessmentCard(blockagePercent: blockagePercent),
             const SizedBox(height: 16),
           ],
 
-          // --- 📝 NOTES ---
           if (note.toString().trim().isNotEmpty) ...[
             _buildCard(
               child: Column(
@@ -497,7 +597,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             const SizedBox(height: 16),
           ],
 
-          // --- 🗺️ MAP ---
           if (lat != null && lng != null) ...[
             Container(
               height: 220,
@@ -534,7 +633,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             const SizedBox(height: 30),
           ],
 
-          // --- ❌ WITHDRAW BUTTON ---
           if (_currentStatus == "Pending")
             SizedBox(
               width: double.infinity,

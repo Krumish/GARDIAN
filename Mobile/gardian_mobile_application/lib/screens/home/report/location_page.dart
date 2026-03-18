@@ -87,7 +87,6 @@ class _LocationPageState extends State<LocationPage> {
 
     setState(() => _processing = true);
 
-    // THE FORK IN THE ROAD: YOLO vs MANUAL
     if (widget.requiresAI) {
       Navigator.push(
         context,

@@ -50,6 +50,7 @@ class ReportHistory extends StatelessWidget {
           });
           final activeStatuses = selectedFilters.intersection({
             "Pending",
+            "Assigned",
             "Resolved",
             "Withdrawn",
           });
@@ -151,6 +152,10 @@ class _ReportCardState extends State<_ReportCard>
       case "Resolved":
         statusColor = Colors.green.shade600;
         statusIcon = Icons.check_circle_rounded;
+        break;
+      case "Assigned":
+        statusColor = Colors.indigo.shade600;
+        statusIcon = Icons.assignment_ind_rounded;
         break;
       case "Withdrawn":
         statusColor = Colors.grey.shade600;
