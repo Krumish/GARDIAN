@@ -238,20 +238,6 @@ function ManholeAISummary({ yolo }) {
         <StatTile label="Avg Confidence" value={`${Math.round(avgConf * 100)}%`} colorClass="bg-white border-gray-300 text-gray-800" />
       </div>
 
-      {/* Intact vs Broken breakdown */}
-      {(intact.length > 0 || broken.length > 0) && (
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
-            <p className="text-xs font-bold text-emerald-700 uppercase mb-1">✅ Intact Manhole</p>
-            <p className="text-2xl font-black text-emerald-800">{intact.length}</p>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-            <p className="text-xs font-bold text-red-700 uppercase mb-1">⚠️ Broken Manhole</p>
-            <p className="text-2xl font-black text-red-800">{broken.length}</p>
-          </div>
-        </div>
-      )}
-
       {boxes.length > 0 && (
         <div className="bg-white border border-gray-300 rounded-lg p-3">
           <p className="text-xs font-bold text-gray-600 uppercase mb-2">Detection Confidence</p>
@@ -458,10 +444,8 @@ const ReportDetailsModal = ({ selectedReport, onClose, formatDate, formatTime })
 
   const getStatusColor = (status) => ({
     'Pending':     'bg-amber-50 text-amber-800 border-amber-200',
-    'Under Review':'bg-blue-50 text-blue-800 border-blue-200',
-    'In Progress': 'bg-purple-50 text-purple-800 border-purple-200',
+    'Assigned':'bg-blue-50 text-blue-800 border-blue-200',
     'Resolved':    'bg-emerald-50 text-emerald-800 border-emerald-200',
-    'Rejected':    'bg-red-50 text-red-800 border-red-200',
   }[status] || 'bg-gray-50 text-gray-800 border-gray-200');
 
   const getIssueTypeIcon = (type) => ({
