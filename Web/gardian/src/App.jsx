@@ -1,181 +1,213 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { db } from "../firebase";
 import { collectionGroup, onSnapshot, getDoc, doc } from "firebase/firestore";
 import { useUser } from "./context/UserContext.jsx";
 
 // Components
-import Sidebar from "./components/Sidebar";
-import Topbar from "./components/Topbar";
+import Sidebar         from "./components/Sidebar";
+import Topbar          from "./components/Topbar";
 import MonthlyReportChart from "./components/MonthlyReportChart";
-import Analytics from "./components/Analytics";
-import Reports from "./components/Reports";
+import Analytics       from "./components/Analytics";
+import Reports         from "./components/Reports";
 import CitizenFeedback from "./components/CitizenFeedback";
-import Login from "./components/Login";
-import Signup from "./components/Signup";
-import UserManagement from "./components/UserManagement";
-import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import Login           from "./components/Login";
+import Signup          from "./components/Signup";
+import UserManagement  from "./components/UserManagement";
+import ProtectedRoute  from "./components/ProtectedRoute.jsx";
 
 // Icons
-import { FaHistory, FaUsers, FaCheckCircle, FaMapMarkerAlt, FaUser } from "react-icons/fa";
-import { TbReportOff } from "react-icons/tb";
+import {
+  FaCheckCircle, FaMapMarkerAlt, FaUser, FaUsers,
+  FaArrowRight, FaChartBar,
+} from "react-icons/fa";
+import { TbReportOff }    from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
-import { MdPending } from "react-icons/md";
+import { MdPending, MdEngineering, MdLocalShipping } from "react-icons/md";
+import { GiRecycle }      from "react-icons/gi";
+import { FaUserCheck }    from "react-icons/fa";
+import { FaClockRotateLeft } from "react-icons/fa6";
+import { Link } from "react-router-dom";
 
+// ── Department routing (mirrors Reports.jsx) ──────────────────────────────────
+function getAssignedDepartment(issueType) {
+  if (["Waste Management", "Solid Waste"].includes(issueType))                         return "MENRO / WMO";
+  if (["Drainage", "Road Blockage"].includes(issueType))                               return "Mayor / Dispatch";
+  if (["Pothole", "Manhole", "Road Markings", "Road Surface"].includes(issueType))     return "Engineering Office";
+  return "Unassigned";
+}
+const getDept = (r) => r.assignedDepartment || getAssignedDepartment(r.issueType);
+
+// Status badge config — matches Reports.jsx
+const STATUS_CONFIG = {
+  Pending:   { cls:"bg-amber-50 text-amber-700 border border-amber-200",  icon:<FaClockRotateLeft className="text-amber-500 shrink-0"/> },
+  Assigned:  { cls:"bg-cyan-50 text-cyan-700 border border-cyan-200",     icon:<FaUserCheck className="text-cyan-500 shrink-0"/> },
+  Withdrawn: { cls:"bg-gray-50 text-gray-600 border border-gray-200",     icon:<TbReportOff className="text-gray-400 shrink-0"/> },
+  Resolved:  { cls:"bg-green-50 text-green-700 border border-green-200",  icon:<FaCheckCircle className="text-green-500 shrink-0"/> },
+};
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.Pending;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${cfg.cls}`}>
+      {cfg.icon}{status}
+    </span>
+  );
+}
+
+// Dept badge — matches Reports.jsx palette
+const DEPT_BADGE = {
+  "MENRO / WMO":        "bg-teal-50 text-teal-700 border-teal-200",
+  "Mayor / Dispatch":   "bg-indigo-50 text-indigo-700 border-indigo-200",
+  "Engineering Office": "bg-orange-50 text-orange-700 border-orange-200",
+  "Unassigned":         "bg-gray-50 text-gray-500 border-gray-200",
+};
+
+const genRef = (r) => {
+  if (!r?.id) return "REF-00000000-XXXXX";
+  const ts = r.uploadedAt;
+  const d  = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+  const ds = d && !isNaN(d) ? d.toISOString().slice(0,10).replace(/-/g,"") : "00000000";
+  return `REF-${ds}-${r.id.slice(-5).toUpperCase()}`;
+};
+
+const fmtDate = (ts) => {
+  if (!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+};
+
+const fmtTime = (ts) => {
+  if (!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleTimeString("en-US", { hour:"2-digit", minute:"2-digit" });
+};
+
+// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const location = useLocation();
   const { user, role, loading } = useUser();
-  const [reports, setReports] = useState([]);
+  const [reports, setReports]       = useState([]);
   const [recentReports, setRecentReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(true);
 
-  const isAuthPage =
-    location.pathname === "/login" || location.pathname === "/signup";
+  const isAuthPage = location.pathname === "/login" || location.pathname === "/signup";
 
-  // --- Helper: Generate REF number ---
-  const generateRefCode = (report) => {
-    if (!report || !report.id) return "REF-00000000-XXXXX";
-    const ts = report.uploadedAt;
-    const dateObj = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
-    const dateStr = dateObj && !isNaN(dateObj) ? dateObj.toISOString().slice(0, 10).replace(/-/g, "") : "00000000";
-    const shortHash = report.id.slice(-5).toUpperCase();
-    return `REF-${dateStr}-${shortHash}`;
-  };
-
-  // Fetch ALL reports
+  // ── Real-time fetch all reports — with user details (for barangay grouping) ──
   useEffect(() => {
     if (!user || !role) return;
 
-    const q = collectionGroup(db, "uploads");
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => {
-          const userId = doc.ref.parent.parent?.id || "unknown";
+    // Cache user docs in memory to avoid fetching the same user repeatedly
+    const userCache = {};
+
+    return onSnapshot(
+      collectionGroup(db, "uploads"),
+      async (snapshot) => {
+        // Collect unique userIds from this snapshot
+        const userIds = [...new Set(
+          snapshot.docs
+            .map(d => d.ref.parent.parent?.id)
+            .filter(Boolean)
+        )];
+
+        // Fetch any uncached users in parallel
+        await Promise.all(
+          userIds
+            .filter(uid => !userCache[uid])
+            .map(async (uid) => {
+              try {
+                const snap = await getDoc(doc(db, "users", uid));
+                userCache[uid] = snap.exists() ? snap.data() : null;
+              } catch (_) {
+                userCache[uid] = null;
+              }
+            })
+        );
+
+        // Build enriched reports using cached user data
+        const data = snapshot.docs.map((d) => {
+          const userId = d.ref.parent.parent?.id || "unknown";
           return {
-            id: doc.id,
-            userId: userId,
-            ...doc.data(),
+            id: d.id,
+            userId,
+            userDetails: userCache[userId] || null,
+            ...d.data(),
           };
         });
-        setReports(data);
-      },
-      (err) => console.error("Error fetching reports:", err)
-    );
 
-    return () => unsubscribe();
+        setReports(data);
+        setLoadingReports(false);
+      },
+      (err) => { console.error(err); setLoadingReports(false); }
+    );
   }, [user, role]);
 
-  // Process 5 Recent Reports 
+  // ── Top 5 recent reports (already have userDetails, just add refCode) ────
   useEffect(() => {
-    if (reports.length === 0) {
-      setRecentReports([]);
-      return;
-    }
-
-    const processRecent = async () => {
-      // Sort by date (Newest first)
-      const sorted = [...reports].sort((a, b) => {
-        const dateA = a.uploadedAt?.seconds || 0;
-        const dateB = b.uploadedAt?.seconds || 0;
-        return dateB - dateA;
-      });
-
-      // Get recent 5
-      const top5 = sorted.slice(0, 5);
-
-      // Fetch User Details
-      const detailed = await Promise.all(
-        top5.map(async (report) => {
-          let userDetails = null;
-          if (report.userId && report.userId !== "unknown") {
-            try {
-              const userDoc = await getDoc(doc(db, "users", report.userId));
-              if (userDoc.exists()) {
-                userDetails = userDoc.data();
-              }
-            } catch (err) {
-              console.error("Error fetching user:", err);
-            }
-          }
-
-          return {
-            ...report,
-            userDetails,
-            refCode: generateRefCode(report),
-          };
-        })
-      );
-
-      setRecentReports(detailed);
-    };
-
-    processRecent();
+    if (!reports.length) { setRecentReports([]); return; }
+    const sorted = [...reports]
+      .sort((a, b) => (b.uploadedAt?.seconds || 0) - (a.uploadedAt?.seconds || 0))
+      .slice(0, 5)
+      .map(r => ({ ...r, refCode: genRef(r) }));
+    setRecentReports(sorted);
   }, [reports]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen text-xl font-semibold">
-        Loading...
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="w-10 h-10 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mx-auto mb-3"/>
+          <p className="text-sm text-gray-400 font-medium">Loading GARDIAN…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50">
       {!isAuthPage && user && <Sidebar />}
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {!isAuthPage && user && (
           <div className="sticky top-0 z-50">
             <Topbar />
           </div>
         )}
 
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route
               path="/"
               element={
                 <ProtectedRoute
-                  component={() => <Dashboard reports={reports} recentReports={recentReports} />}
+                  component={() => (
+                    <Dashboard
+                      reports={reports}
+                      recentReports={recentReports}
+                      loading={loadingReports}
+                    />
+                  )}
                   allowedRoles={["super_admin", "personnel_admin"]}
                 />
               }
             />
-            <Route path="/login" element={<Login />} />
+            <Route path="/login"  element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route
               path="/analytics"
-              element={
-                <ProtectedRoute
-                  component={Analytics}
-                  allowedRoles={["super_admin", "personnel_admin"]}
-                />
-              }
+              element={<ProtectedRoute component={Analytics} allowedRoles={["super_admin","personnel_admin"]}/>}
             />
             <Route
               path="/reports"
-              element={
-                <ProtectedRoute
-                  component={Reports}
-                  allowedRoles={["super_admin", "personnel_admin", "staff_admin"]}
-                />
-              }
+              element={<ProtectedRoute component={Reports} allowedRoles={["super_admin","personnel_admin","staff_admin"]}/>}
             />
             <Route
               path="/usermanagement"
-              element={
-                <ProtectedRoute component={UserManagement} allowedRoles={["super_admin"]} />
-              }
+              element={<ProtectedRoute component={UserManagement} allowedRoles={["super_admin"]}/>}
             />
             <Route
               path="/feedback"
-              element={
-                <ProtectedRoute
-                  component={CitizenFeedback}
-                  allowedRoles={["super_admin", "personnel_admin"]}
-                />
-              }
+              element={<ProtectedRoute component={CitizenFeedback} allowedRoles={["super_admin","personnel_admin"]}/>}
             />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
@@ -185,208 +217,160 @@ export default function App() {
   );
 }
 
-// ---------------- Dashboard Component ----------------
-function Dashboard({ reports, recentReports }) {
-  const pendingCount = reports.filter((r) => r.status === "Pending").length;
-  const withdrawnCount = reports.filter((r) => r.status === "Withdrawn").length;
-  const resolvedCount = reports.filter((r) => r.status === "Resolved").length;
-  const totalCount = reports.length;
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function Dashboard({ reports, recentReports, loading }) {
+  const pending   = reports.filter(r => r.status === "Pending").length;
+  const assigned  = reports.filter(r => r.status === "Assigned").length;
+  const resolved  = reports.filter(r => r.status === "Resolved").length;
+  const withdrawn = reports.filter(r => r.status === "Withdrawn").length;
+  const total     = reports.length;
 
-  const formatDate = (ts) => {
-    if (!ts) return "-";
-    if (ts.toDate) return ts.toDate().toLocaleDateString();
-    return new Date(ts).toLocaleDateString();
+  // Department pending breakdown
+  const deptCounts = {
+    "MENRO / WMO":        reports.filter(r => r.status === "Pending" && getDept(r) === "MENRO / WMO").length,
+    "Mayor / Dispatch":   reports.filter(r => r.status === "Pending" && getDept(r) === "Mayor / Dispatch").length,
+    "Engineering Office": reports.filter(r => r.status === "Pending" && getDept(r) === "Engineering Office").length,
   };
 
-  const formatTime = (ts) => {
-    if (!ts) return "-";
-    if (ts.toDate) return ts.toDate().toLocaleTimeString();
-    return new Date(ts).toLocaleTimeString();
-  };
-
-  // Helper
-  const getInfrastructureType = (report) => {
-    if (report.yolo?.drainage_count > 0) return "Drainage";
-    return report.issueType || "Unknown";
-  };
+  const resolutionRate = total ? Math.round((resolved / total) * 100) : 0;
+  const getType = (r) => r.yolo?.drainage_count > 0 ? "Drainage" : r.issueType || "Unknown";
 
   return (
-    <>
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+    <div className="p-6 space-y-6 bg-gray-50 min-h-full">
 
-{/* Stats Cards */}
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+        </div>
+      </div>
 
-  <StatCard
-    title="Pending"
-    value={pendingCount}
-    color="text-orange-500"
-    bgColor="bg-orange-50"
-    icon={<RiHourglassFill className="text-orange-500 w-10 h-10" />}
-  />
+      {/* ── Summary strip ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        {[
+          { label:"Pending", val:pending,   color:"text-amber-700", bg:"bg-amber-50", border:"border-amber-200", icon: <FaClockRotateLeft /> },
+          { label:"Assigned",   val:assigned,  color:"text-cyan-700",  bg:"bg-cyan-50",  border:"border-cyan-200",  icon: <FaUserCheck /> },
+          { label:"Resolved",      val:resolved,  color:"text-green-700", bg:"bg-green-50", border:"border-green-200", icon: <FaCheckCircle /> },
+          { label:"Withdrawn",     val:withdrawn, color:"text-gray-500",  bg:"bg-gray-50",  border:"border-gray-200",  icon: <TbReportOff /> },
+          { label:"Total Logs",    val:total,     color:"text-slate-700", bg:"bg-white",    border:"border-slate-200", icon: <FaChartBar /> },
+        ].map(({ label, val, color, bg, border, icon }) => (
+          <div key={label} className={`${bg} border ${border} rounded-xl px-5 py-4 shadow-sm flex flex-col justify-between`}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</p>
+              <span className={`text-lg opacity-50 ${color}`}>{icon}</span>
+            </div>
+            {loading
+              ? <div className="h-8 w-16 bg-black/5 rounded animate-pulse mt-1"/>
+              : <p className={`text-3xl font-black ${color}`}>{val}</p>
+            }
+          </div>
+        ))}
+      </div>
 
-  <StatCard
-    title="Withdrawn"
-    value={withdrawnCount}
-    color="text-gray-500"
-    bgColor="bg-gray-100"
-    icon={<TbReportOff className="text-gray-500 w-10 h-10" />}
-  />
-
-  <StatCard
-    title="Resolved"
-    value={resolvedCount}
-    color="text-green-500"
-    bgColor="bg-green-50"
-    icon={<FaHistory className="text-green-500 w-10 h-10" />}
-  />
-
-  <StatCard
-    title="Total Reports"
-    value={totalCount}
-    color="text-blue-500"
-    bgColor="bg-blue-50"
-    icon={<FaUsers className="text-blue-500 w-10 h-10" />}
-  />
-</div>
-
-      {/* Chart */}
-      <div className="p-6 bg-white rounded-xl shadow mb-6">
+      {/* ── Monthly chart ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
         <MonthlyReportChart reports={reports} />
       </div>
 
-      {/* Recent Reports Table */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Recent Reports</h2>
-        
+      {/* ── Recent Reports table ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Recent Incident Logs</h2>
+            <p className="text-xs text-gray-500 mt-0.5">The 5 most recent submissions from citizens</p>
+          </div>
+          <Link
+            to="/reports"
+            className="text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition"
+          >
+            Manage All <FaArrowRight className="text-[10px]"/>
+          </Link>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-100 sticky top-0 z-10 bg-white shadow">
-                <th className="px-4 py-2 font-bold text-left">Reference Number</th>
-                <th className="px-4 py-2 font-bold text-left">Name</th>
-                <th className="px-4 py-2 font-bold text-left">Type</th>
-                <th className="px-4 py-2 font-bold text-left">Address</th>
-                <th className="px-4 py-2 font-bold text-left">Date</th>
-                <th className="px-4 py-2 font-bold text-left">Time</th>
-                <th className="px-4 py-2 font-bold text-left">Status</th>
+              <tr className="bg-gray-50/50 border-b border-gray-200">
+                <th className="px-6 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Reference</th>
+                <th className="px-6 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Reporter</th>
+                <th className="px-6 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Issue Type</th>
+                <th className="px-6 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Routed To</th>
+                <th className="px-6 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Submitted</th>
+                <th className="px-6 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
-            <tbody>
-              {recentReports.length > 0 ? (
-                recentReports.map((report) => (
-                  <tr key={report.id} className="border-b hover:bg-gray-50 text-sm">
-                    {/* Reference Number Column */}
-                    <td className="py-3 px-4">
-                      <div
-                        className="inline-flex items-center bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden"
-                        title="Click REF to copy"
-                      >
-                        <span className="px-2 py-1 bg-gray-100 text-[10px] font-bold text-gray-500 border-r border-gray-300">
-                          REF
-                        </span>
-                        <button
-                          onClick={() => navigator.clipboard.writeText(report.refCode)}
-                          className="px-2 py-1 font-mono text-xs text-gray-800 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100 transition-colors"
-                        >
-                          {report.refCode}
-                        </button>
-                      </div>
-                    </td>
-
-                    {/* Name Column */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        <FaUser className="text-gray-400 mr-2 text-xs" />
-                        <div>
-                          <div className="font-medium">
-                            {report.userDetails?.firstName} {report.userDetails?.lastName}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Type Column */}
-                    <td className="py-3 px-4 text-gray-700 font-medium">
-                      {getInfrastructureType(report)}
-                    </td>
-
-                    {/* Address Column */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        <FaMapMarkerAlt className="text-gray-400 mr-1 text-xs" />
-                        <span className="text-gray-700 text-xs font-medium">
-                          {report.address || "-"}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Date Column */}
-                    <td className="py-3 px-4 text-xs">
-                      {formatDate(report.uploadedAt)}
-                    </td>
-
-                    {/* Time Column */}
-                    <td className="py-3 px-4 text-xs">
-                      {formatTime(report.uploadedAt)}
-                    </td>
-
-                    {/* Status Column */}
-                    <td className="py-3 px-4">
-                      {/* Using div instead of button since dashboard is view-only, but keeping style */}
-                      <div className="flex items-center">
-                        {report.status === "Pending" && (
-                          <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-                            <RiHourglassFill className="mr-1" /> Pending
-                          </span>
-                        )}
-                        {report.status === "Withdrawn" && (
-                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-                            <MdPending className="mr-1" /> Withdrawn
-                          </span>
-                        )}
-                        {report.status === "Resolved" && (
-                          <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-                            <FaCheckCircle className="mr-1" /> Resolved
-                          </span>
-                        )}
-                      </div>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                Array.from({length:5}).map((_,i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td colSpan="7" className="px-6 py-5">
+                      <div className="h-4 bg-gray-200 rounded w-full"/>
                     </td>
                   </tr>
                 ))
-              ) : (
+              ) : recentReports.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-4 text-gray-500 italic">
-                    No recent reports found.
+                  <td colSpan="7" className="text-center py-16 text-gray-400">
+                    <FaCheckCircle className="mx-auto text-4xl mb-3 text-gray-300"/>
+                    <p className="text-base font-bold text-gray-500">All caught up!</p>
+                    <p className="text-xs mt-1">No recent reports to display.</p>
                   </td>
                 </tr>
-              )}
+              ) : recentReports.map((r) => {
+                const dept = getDept(r);
+                return (
+                  <tr key={r.id} className="hover:bg-gray-50/80 transition-colors group">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                        {r.refCode}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                          <FaUser className="text-xs"/>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-xs">
+                            {r.userDetails?.firstName} {r.userDetails?.lastName}
+                          </p>
+                          <p className="text-[11px] text-gray-500 truncate max-w-[120px]">
+                            {r.userDetails?.barangay || r.address || "Location unknown"}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-semibold text-gray-800 text-xs">
+                      {getType(r)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-bold border ${DEPT_BADGE[dept] || DEPT_BADGE["Unassigned"]}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 shrink-0"/>
+                        {dept}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-xs font-bold text-gray-800">{fmtDate(r.uploadedAt)}</p>
+                      <p className="text-[10px] font-medium text-gray-400 mt-0.5">{fmtTime(r.uploadedAt)}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <StatusBadge status={r.status}/>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Link
+                        to="/reports"
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
+                      >
+                        Review
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </div>
-    </>
-  );
-}
-
-const StatCard = ({ title, value, bgColor, color, icon }) => {
-  return (
-    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-6 min-h-[140px] flex items-center justify-between border border-gray-100">
-      
-      {/* Left Content */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-          {title}
-        </h3>
-
-        <p className={`text-3xl font-bold mt-2 ${color}`}>
-          {value}
-        </p>
-      </div>
-
-      {/* Icon */}
-      <div className={`p-4 rounded-xl ${bgColor}`}>
-        {icon}
       </div>
     </div>
   );
