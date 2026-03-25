@@ -4,6 +4,8 @@ import {
   Chart as ChartJS, Title, Tooltip, Legend,
   BarElement, CategoryScale, LinearScale,
 } from "chart.js";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point } from "@turf/helpers";
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
@@ -12,61 +14,109 @@ const MONTHS = [
   "July","August","September","October","November","December",
 ];
 
-// Colors aligned with the Department theme from the Dashboard
 const ISSUE_TYPES = [
-  // MENRO (Teal palette)
-  { label: "Waste Management", color: "#0d9488" }, // teal-600
+  // MENRO (Environment/Cleanliness) - Deep Forest/Teal
+  { label: "Waste Management", color: "#0f766e" }, // Deep Teal
   
-  // Mayor / Dispatch (Indigo/Violet palette)
-  { label: "Drainage",         color: "#4f46e5" }, // indigo-600
-  { label: "Road Blockage",    color: "#7c3aed" }, // violet-600
+  // Mayor / Dispatch (Hazards & Water) - Authoritative Blues & Reds
+  { label: "Drainage",         color: "#1d4ed8" }, // Deep Navy Blue (Water)
+  { label: "Road Blockage",    color: "#be123c" }, // Muted Crimson (Urgent/Stop)
   
-  // Engineering (Orange/Amber/Slate palette)
-  { label: "Pothole",          color: "#ea580c" }, // orange-600
-  { label: "Road Markings",    color: "#d97706" }, // amber-600
-  { label: "Manhole",          color: "#475569" }, // slate-600
+  // Engineering (Asphalt, Paint, & Metal) - Industrial tones
+  { label: "Pothole",          color: "#b45309" }, // Dark Amber/Rust (Caution/Earth)
+  { label: "Road Markings",    color: "#ca8a04" }, // Traffic Gold (Paint)
+  { label: "Manhole",          color: "#334155" }, // Heavy Slate (Iron/Asphalt)
 ];
 
-// Helper to merge San Andres and Poblacion
+// Helper to merge San Andres and Poblacion (if needed)
 const normalizeBarangay = (rawName) => {
   if (!rawName) return "Unknown";
   const name = rawName.trim();
-  // If the string contains either name (case-insensitive), group them
   if (/san andres/i.test(name) || /poblacion/i.test(name)) {
     return "San Andres (Poblacion)";
   }
   return name;
 };
 
+// Updated: Now accepts the loaded GeoJSON data as a parameter
+const getBarangayFromCoords = (lat, lng, geoJsonData) => {
+  if (!lat || !lng || !geoJsonData || !geoJsonData.features) return "Unknown";
+  
+  try {
+    const targetPoint = point([lng, lat]); 
+    for (const feature of geoJsonData.features) {
+      if (booleanPointInPolygon(targetPoint, feature)) {
+        // Check standard keys used in PH GeoJSONs. 
+        // Adjust these properties if your GeoJSON uses a specific key like 'BRGY_NAME'
+        return feature.properties.name || feature.properties.NAME_4 || feature.properties.ADM4_EN || "Unknown"; 
+      }
+    }
+    return "Outside Jurisdiction"; 
+  } catch (err) {
+    console.error("Turf PIP Error:", err);
+    return "Unknown";
+  }
+};
+
 export default function MonthlyReportChart({ reports = [] }) {
   const [selectedMonth, setSelectedMonth]         = useState(new Date().getMonth());
   const [selectedTypes, setSelectedTypes]         = useState(ISSUE_TYPES.map(t => t.label));
   const [selectedBarangays, setSelectedBarangays] = useState([]);
+  
+  // NEW: State to hold your GeoJSON data
+  const [geoJsonData, setGeoJsonData]             = useState(null);
 
-  // ── Derive normalized barangays from live data ──────────────────────────
+  // NEW: Fetch the GeoJSON from the public folder when the component mounts
+  useEffect(() => {
+    // Files in the public folder are accessible at the root path '/'
+    fetch('/cainta_barangays.geojson')
+      .then(res => res.json())
+      .then(data => setGeoJsonData(data))
+      .catch(err => console.error("Error loading Cainta GeoJSON:", err));
+  }, []);
+
+  // Update: Only run computation if geoJsonData is loaded
+  const reportsWithAccurateLocation = useMemo(() => {
+    // If the map hasn't loaded yet, just return the raw reports temporarily
+    if (!geoJsonData) return reports.map(r => ({ ...r, _computedBarangay: "Loading..." }));
+
+    return reports.map(r => {
+      // Ensure these match your Firestore document structure!
+      const lat = r.location?.latitude || r.lat || r.latitude;
+      const lng = r.location?.longitude || r.lng || r.longitude;
+
+      const rawBarangay = getBarangayFromCoords(lat, lng, geoJsonData);
+
+      return {
+        ...r,
+        _computedBarangay: normalizeBarangay(rawBarangay)
+      };
+    });
+  }, [reports, geoJsonData]);
+
+  // Derive unique barangays
   const barangays = useMemo(() => {
     const set = new Set(
-      reports
-        .map(r => normalizeBarangay(r.userDetails?.barangay || r.barangay))
-        .filter(b => b !== "Unknown")
+      reportsWithAccurateLocation
+        .map(r => r._computedBarangay)
+        .filter(b => b !== "Unknown" && b !== "Outside Jurisdiction" && b !== "Loading...")
     );
     return Array.from(set).sort();
-  }, [reports]);
+  }, [reportsWithAccurateLocation]);
 
-  // Auto-select all barangays on first load
   useEffect(() => {
     if (barangays.length > 0 && selectedBarangays.length === 0) {
       setSelectedBarangays(barangays);
     }
   }, [barangays]);
 
-  // ── Build chart data ────────────────────────────────────────────────────
+  // Build Chart Data
   const chartData = useMemo(() => {
     if (!selectedBarangays.length || !selectedTypes.length) {
       return { labels: [], datasets: [] };
     }
 
-    const monthReports = reports.filter(r => {
+    const monthReports = reportsWithAccurateLocation.filter(r => {
       const d = r.uploadedAt?.toDate ? r.uploadedAt.toDate() : r.uploadedAt ? new Date(r.uploadedAt) : null;
       return d && !isNaN(d) && d.getMonth() === selectedMonth;
     });
@@ -77,11 +127,10 @@ export default function MonthlyReportChart({ reports = [] }) {
         label,
         data: selectedBarangays.map(barangay =>
           monthReports.filter(r =>
-            r.issueType === label &&
-            normalizeBarangay(r.userDetails?.barangay || r.barangay) === barangay
+            r.issueType === label && r._computedBarangay === barangay
           ).length
         ),
-        backgroundColor: color + "E6", // 90% opacity for a richer, solid look
+        backgroundColor: color + "E6",
         borderColor: color,
         borderWidth: 1.5,
         borderRadius: 4,
@@ -89,9 +138,9 @@ export default function MonthlyReportChart({ reports = [] }) {
       }));
 
     return { labels: selectedBarangays, datasets };
-  }, [reports, selectedMonth, selectedBarangays, selectedTypes]);
+  }, [reportsWithAccurateLocation, selectedMonth, selectedBarangays, selectedTypes]);
 
-  // ── Month total for subtitle ────────────────────────────────────────────
+  // Month Total
   const monthTotal = useMemo(() => {
     return reports.filter(r => {
       const d = r.uploadedAt?.toDate ? r.uploadedAt.toDate() : r.uploadedAt ? new Date(r.uploadedAt) : null;
@@ -99,46 +148,79 @@ export default function MonthlyReportChart({ reports = [] }) {
     }).length;
   }, [reports, selectedMonth]);
 
-  // ── Toggles ─────────────────────────────────────────────────────────────
-  const toggleBarangay = (b) =>
-    setSelectedBarangays(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
-
-  const toggleType = (t) =>
-    setSelectedTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+  // Toggles
+  const toggleBarangay = (b) => setSelectedBarangays(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
+  const toggleType = (t) => setSelectedTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
   const hasData = chartData.datasets.some(d => d.data.some(v => v > 0));
 
-  const chartOptions = {
+const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
     plugins: {
       legend: {
         position: "top",
-        labels: { padding: 16, font: { size: 12, family: "'Inter', sans-serif", weight: "500" }, usePointStyle: true, pointStyle: "rectRounded" },
+        align: "end", 
+        labels: { 
+          padding: 20, 
+          font: { size: 12, family: "'Inter', sans-serif", weight: "600" }, 
+          color: "#475569", 
+          usePointStyle: true, 
+          pointStyle: "circle",
+          boxWidth: 8
+        },
       },
       tooltip: {
-        backgroundColor: "rgba(15, 23, 42, 0.95)", // Slate-900
-        titleFont: { size: 13, family: "'Inter', sans-serif" },
+        backgroundColor: "rgba(15, 23, 42, 0.95)", 
+        titleColor: "#f8fafc",
+        bodyColor: "#cbd5e1",
+        titleFont: { size: 13, family: "'Inter', sans-serif", weight: "bold" },
         bodyFont:  { size: 12, family: "'Inter', sans-serif" },
         padding: 12,
-        cornerRadius: 8,
+        cornerRadius: 6,
+        borderColor: "rgba(255, 255, 255, 0.1)", 
+        borderWidth: 1,
         callbacks: {
           footer: (items) => {
             const sum = items.reduce((s, i) => s + i.raw, 0);
-            return sum > 0 ? `\nTotal Issues: ${sum}` : "";
+            return sum > 0 ? `\nTotal in Area: ${sum}` : "";
           },
         },
       },
     },
     scales: {
       x: { 
-        grid: { display: false }, 
-        ticks: { font: { size: 11, family: "'Inter', sans-serif" }, color: "#64748b" } 
+        border: { display: false }, 
+        grid: { 
+          display: false, 
+          drawBorder: false, 
+        }, 
+        ticks: { 
+          font: { size: 11, family: "'Inter', sans-serif", weight: "500" }, 
+          color: "#64748b",
+          padding: 8
+        } 
       },
       y: {
         beginAtZero: true,
-        grid: { color: "#f1f5f9", drawBorder: false }, // Slate-100
-        ticks: { font: { size: 11, family: "'Inter', sans-serif" }, color: "#64748b", precision: 0, stepSize: 1 },
+        border: { display: false }, 
+        grid: { 
+          color: "#e2e8f0", 
+          drawBorder: false,
+          tickLength: 0, 
+          borderDash: [5, 5] 
+        },
+        ticks: { 
+          font: { size: 11, family: "'Inter', sans-serif", weight: "500" }, 
+          color: "#94a3b8", 
+          precision: 0, 
+          stepSize: 1,
+          padding: 12
+        },
       },
     },
   };
@@ -149,7 +231,7 @@ export default function MonthlyReportChart({ reports = [] }) {
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 tracking-tight">Incident Volume by Location</h2>
+          <h2 className="text-lg font-bold text-gray-900 tracking-tight">Incident Volume by Barangay</h2>
           <p className="text-xs font-medium text-gray-500 mt-0.5">
             {MONTHS[selectedMonth]} Overview — <span className="text-blue-600 font-bold">{monthTotal}</span> total logs
           </p>
@@ -161,33 +243,6 @@ export default function MonthlyReportChart({ reports = [] }) {
         >
           {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
         </select>
-      </div>
-
-      {/* ── Issue Type Filter Chips ── */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setSelectedTypes(ISSUE_TYPES.map(t => t.label))}
-          className="text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition shadow-sm"
-        >
-          Select All
-        </button>
-        {ISSUE_TYPES.map(({ label, color }) => {
-          const active = selectedTypes.includes(label);
-          return (
-            <button
-              key={label}
-              onClick={() => toggleType(label)}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border transition font-bold shadow-sm"
-              style={active
-                ? { backgroundColor: color + "15", borderColor: color + "40", color: color }
-                : { backgroundColor: "#ffffff", borderColor: "#e2e8f0", color: "#94a3b8" } // Slate-400
-              }
-            >
-              <span className="w-2.5 h-2.5 rounded-sm shrink-0 transition-colors" style={{ background: active ? color : "#cbd5e1" }}/>
-              {label}
-            </button>
-          );
-        })}
       </div>
 
       {/* ── Barangay Filter ── */}

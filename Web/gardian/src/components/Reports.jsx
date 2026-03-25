@@ -6,13 +6,15 @@ import ReportDetailsModal      from './ReportDetailsModal';
 import ResolutionDetailsModal  from './ResolutionDetailsModal';
 import ResolveReportModal      from './ResolveReportModal';
 import { generatePDF, generateCSV, generateDOCX } from './ReportGenerate';
+import { useReactToPrint } from "react-to-print";
+import PrintableReport from "./PrintableReport";
 
 import { TbReportOff } from "react-icons/tb";
 import {
   FaFilePdf, FaUsers, FaCheckCircle, FaSearch,
   FaMapMarkerAlt, FaUser, FaUserCheck, FaShareSquare,
   FaRegSquare, FaCheckSquare, FaChevronDown, FaChevronUp,
-  FaFilter, FaSortAmountDown, FaTimes, FaChartBar,
+  FaFilter, FaSortAmountDown, FaTimes, FaChartBar, FaPrint,
 } from "react-icons/fa";
 import { FaClockRotateLeft } from "react-icons/fa6";
 import { RiHourglassFill }   from "react-icons/ri";
@@ -62,14 +64,14 @@ const DEPT_COLORS = {
   gray:   { badge:"bg-gray-50 text-gray-500 border-gray-200",      dot:"bg-gray-400",   ring:"ring-gray-300"   },
 };
 
-// Status colors remain semantic (traffic-light logic — do NOT change these)
+// Status colors
 const STATUS_CONFIG = {
   Pending:   { cls:"bg-amber-50 text-amber-700 border border-amber-200",   icon:<RiHourglassFill className="text-amber-500 shrink-0"/> },
   Assigned:  { cls:"bg-cyan-50 text-cyan-700 border border-cyan-200",      icon:<FaUserCheck className="text-cyan-500 shrink-0"/> },
-  Withdrawn: { cls:"bg-gray-50 text-gray-600 border border-gray-200",      icon:<TbReportOff className="text-gray-400 shrink-0"/> },
+  Forwarded: { cls:"bg-blue-50 text-blue-700 border border-blue-200",      icon:<FaShareSquare className="text-blue-500 shrink-0"/> },  
   Resolved:  { cls:"bg-green-50 text-green-700 border border-green-200",   icon:<FaCheckCircle className="text-green-500 shrink-0"/> },
+  Withdrawn: { cls:"bg-gray-50 text-gray-600 border border-gray-200",      icon:<TbReportOff className="text-gray-400 shrink-0"/> },
 };
-
 function DeptBadge({ dept }) {
   const d = DEPT[dept] || DEPT["Unassigned"];
   const c = DEPT_COLORS[d.color];
@@ -133,10 +135,32 @@ export default function Reports() {
   const counts = {
     pending:   reports.filter(r => r.status === "Pending").length,
     assigned:  reports.filter(r => r.status === "Assigned").length,
+    forwarded: reports.filter(r => r.status === "Forwarded").length,
     resolved:  reports.filter(r => r.status === "Resolved").length,
     withdrawn: reports.filter(r => r.status === "Withdrawn").length,
     total:     reports.length,
   };
+
+  // ── Print Configuration ───────────────────────────────────────────────────
+  const singlePrintRef = useRef();
+  const printRef = useRef();
+  const [reportToPrint, setReportToPrint] = useState(null); 
+  
+  // Gets only the full objects for the checkboxes you ticked
+  const selectedReportsData = reports.filter(r => selectedIds.has(r.id)); 
+
+  // Single print
+  const handleSinglePrint = useReactToPrint({
+    contentRef: singlePrintRef,   // ← was: content: () => singlePrintRef.current
+    documentTitle: `GARDIAN_Report_${reportToPrint?.id || "Single"}`,
+    onAfterPrint: () => setReportToPrint(null),
+  });
+
+  // Batch print
+  const handleBatchPrint = useReactToPrint({
+    contentRef: printRef,         // ← was: content: () => printRef.current
+    documentTitle: `GARDIAN_Batch_Report_${new Date().toISOString().slice(0,10)}`,
+  });
 
   const deptPending = Object.fromEntries(
     Object.keys(DEPT).map(d => [d, reports.filter(r => r.status === "Pending" && getDept(r) === d).length])
@@ -147,6 +171,15 @@ export default function Reports() {
     const id = new URLSearchParams(location.search).get("highlight");
     if (id) { setHighlightedId(id); navigate("/reports", { replace: true }); }
   }, [location.search, navigate]);
+
+  useEffect(() => {
+    if (reportToPrint) {
+      const timer = setTimeout(() => {
+        handleSinglePrint();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [reportToPrint]);
 
   useEffect(() => {
     if (!highlightedId || scrolled.current === highlightedId) return;
@@ -197,7 +230,7 @@ export default function Reports() {
   const filtered = reports
     .filter(r => {
       const s = search.toLowerCase();
-      return !s || [r.id, r.userDetails?.firstName, r.userDetails?.lastName,
+      return !s || [r.id, genRef(r), r.userDetails?.firstName, r.userDetails?.lastName,
         r.userDetails?.barangay, r.status, getType(r), getDept(r)]
         .some(v => (v||"").toLowerCase().includes(s));
     })
@@ -243,7 +276,8 @@ export default function Reports() {
         const batch = writeBatch(db);
         items.slice(i, i+CHUNK).forEach(r => {
           const ref = r.docRef?.id ? r.docRef : doc(db,"users",r.userId,"uploads",r.id);
-          batch.update(ref, { assignedDepartment: batchDept, status: "Assigned", forwardedAt: new Date().toISOString() });
+          // CHANGED status from "Assigned" to "Forwarded"
+          batch.update(ref, { assignedDepartment: batchDept, status: "Forwarded", forwardedAt: new Date().toISOString() });
         });
         await batch.commit();
       }
@@ -267,6 +301,19 @@ export default function Reports() {
   return (
     <>
       <style>{STYLES}</style>
+
+     {/* Hidden printable component for BATCH printing */}
+      <div style={{ position: "absolute", top: "-9999px", left: "-9999px", visibility: "hidden" }}>
+        <PrintableReport ref={printRef} reports={selectedReportsData} />
+      </div>
+
+      {/* NEW: Hidden printable component for SINGLE printing */}
+      <div style={{ position: "absolute", top: "-9999px", left: "-9999px", visibility: "hidden" }}>
+        {reportToPrint && (
+          <PrintableReport ref={singlePrintRef} reports={[reportToPrint]} />
+        )}
+      </div>
+
       <div className="p-6 bg-gray-50 min-h-screen space-y-5">
 
         {/* ── Page header ── */}
@@ -299,23 +346,34 @@ export default function Reports() {
         </div>
 
         {/* ── Summary strip ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {[
-            { label:"Pending",    val:counts.pending,   color:"text-amber-700", bg:"bg-amber-50",  border:"border-amber-200",  icon:<FaClockRotateLeft/>    },
-            { label:"Assigned",   val:counts.assigned,  color:"text-cyan-700",  bg:"bg-cyan-50",   border:"border-cyan-200",   icon:<FaUserCheck />        },
-            { label:"Resolved",   val:counts.resolved,  color:"text-green-700", bg:"bg-green-50",  border:"border-green-200",  icon:<FaCheckCircle />      },
-            { label:"Withdrawn",  val:counts.withdrawn, color:"text-gray-500",  bg:"bg-gray-50",   border:"border-gray-200",   icon:<TbReportOff />        },
-            { label:"Total Logs", val:counts.total,     color:"text-slate-700", bg:"bg-white",     border:"border-slate-200",  icon:<FaChartBar />         },
-          ].map(({ label, val, color, bg, border, icon }) => (
-            <div key={label} className={`${bg} border ${border} rounded-xl px-5 py-4 shadow-sm flex flex-col justify-between`}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</p>
-                <span className={`text-lg opacity-50 ${color}`}>{icon}</span>
-              </div>
-              <p className={`text-3xl font-black ${color}`}>{val}</p>
+     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[
+          { label:"Pending",   val:counts.pending,   color:"text-amber-700", bg:"bg-amber-50", border:"border-amber-200", icon: <FaClockRotateLeft /> },
+          { label:"Assigned",  val:counts.assigned,  color:"text-cyan-700",  bg:"bg-cyan-50",  border:"border-cyan-200",  icon: <FaUserCheck /> },
+          { label:"Forwarded", val:counts.forwarded, color:"text-blue-700",  bg:"bg-blue-50",  border:"border-blue-200",  icon: <FaShareSquare /> },
+          { label:"Resolved",  val:counts.resolved,  color:"text-green-700", bg:"bg-green-50", border:"border-green-200", icon: <FaCheckCircle /> },
+          { label:"Withdrawn", val:counts.withdrawn, color:"text-gray-600",  bg:"bg-gray-50",  border:"border-gray-200",  icon: <TbReportOff /> },
+          { label:"Total Logs",val:counts.total,     color:"text-slate-800", bg:"bg-white",    border:"border-slate-200", icon: <FaChartBar /> },
+        ].map(({ label, val, color, bg, border, icon }) => (
+          <div 
+            key={label} 
+            className={`${bg} border ${border} rounded-xl px-5 py-4 shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md`}
+          >
+            <div className="flex items-start justify-between mb-3">
+              {/* Monochromatic Label: Matches the card color but slightly faded */}
+              <p className={`text-[11px] font-bold uppercase tracking-wider ${color} opacity-80`}>
+                {label}
+              </p>
+              {/* Full opacity icon: Removed the 'opacity-50' so the icon is crisp and sharp */}
+              <span className={`text-[20px] ${color}`}>{icon}</span>
             </div>
-          ))}
-        </div>
+            {loading
+              ? <div className="h-9 w-16 bg-black/10 rounded animate-pulse"/>
+              : <p className={`text-3xl font-extrabold ${color} tracking-tight`}>{val}</p>
+            }
+          </div>
+        ))}
+      </div>
 
         {/* ── Dept pending tiles ── */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -408,6 +466,16 @@ export default function Reports() {
                 <button onClick={allSelected ? clearSel : selectAll} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
                   {allSelected ? "Deselect all" : "Select all pending"}
                 </button>
+
+                {/* NEW BATCH PRINT BUTTON */}
+                    <button
+                      onClick={handleBatchPrint}
+                      disabled={selectedIds.size === 0}
+                      className="text-xs px-3 py-1.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed font-semibold transition flex items-center gap-1.5"
+                    >
+                      <FaPrint /> Print ({selectedIds.size})
+                    </button>
+
                 <select
                   value={batchDept}
                   onChange={e => setBatchDept(e.target.value)}
@@ -438,6 +506,7 @@ export default function Reports() {
                   <option value="">All</option>
                   <option value="Pending">Pending</option>
                   <option value="Assigned">Assigned</option>
+                  <option value="Forwarded">Forwarded</option>
                   <option value="Resolved">Resolved</option>
                   <option value="Withdrawn">Withdrawn</option>
                 </select>
@@ -538,7 +607,7 @@ export default function Reports() {
                         <button
                           onClick={() => navigator.clipboard.writeText(genRef(r))}
                           title="Click to copy"
-                          className="font-mono text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition"
+                          className="font-mono text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition"
                         >
                           {genRef(r)}
                         </button>
@@ -588,233 +657,247 @@ export default function Reports() {
                         <StatusBadge status={r.status} onClick={() => !batchMode && setShowStatusModal(r)}/>
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setSelectedReport(r)}
-                            className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition"
-                          >
-                            View
-                          </button>
-                          {isPending && !batchMode && (
-                            <button
-                              onClick={() => { setSelectedIds(new Set([r.id])); setBatchDept(getAssignedDepartment(r.issueType)); setShowForwardModal(true); }}
-                              className="text-xs px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium transition flex items-center gap-1"
-                            >
-                              <FaShareSquare className="text-[9px]"/> Route
-                            </button>
-                          )}
-                          {r.status === "Resolved" && (
-                            <button
-                              onClick={() => setShowResolutionModal(r)}
-                              className="text-xs px-2.5 py-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 font-medium transition"
-                            >
-                              Resolution
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+{/* Actions */}
+                          <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setSelectedReport(r)}
+                                className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition"
+                              >
+                                View
+                              </button>
+                              
+                              {/* NEW: Single Print Button */}
+                              {!batchMode && (
+                                <button
+                                  onClick={() => setReportToPrint(r)}
+                                  title="Print Transmittal Form"
+                                  className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-200 text-slate-700 font-medium transition flex items-center gap-1"
+                                >
+                                  <FaPrint className="text-[10px]"/> Print
+                                </button>
+                              )}
 
-        {/* ═══════════════ GENERATE REPORT MODAL ═══════════════ */}
-        {showReportModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Generate Report</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Select date range, department, and export format</p>
-                </div>
-                <button onClick={() => setShowReportModal(false)} className="text-gray-300 hover:text-gray-500 transition"><FaTimes/></button>
+                              {/* Single Route/Forward Button */}
+                              {isPending && !batchMode && (
+                                <button
+                                  onClick={() => { setSelectedIds(new Set([r.id])); setBatchDept(getAssignedDepartment(r.issueType)); setShowForwardModal(true); }}
+                                  className="text-xs px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium transition flex items-center gap-1"
+                                >
+                                  <FaShareSquare className="text-[9px]"/> Route
+                                </button>
+                              )}
+                              
+                              {r.status === "Resolved" && (
+                                <button
+                                  onClick={() => setShowResolutionModal(r)}
+                                  className="text-xs px-2.5 py-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 font-medium transition"
+                                >
+                                  Resolution
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            </div>
 
-              <div className="px-6 py-5 space-y-5">
-
-                {/* Date range */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Start Date</label>
-                    <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={startDate} onChange={e => setStartDate(e.target.value)}/>
+            {/* ═══════════════ GENERATE REPORT MODAL ═══════════════ */}
+            {showReportModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">Generate Report</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Select date range, department, and export format</p>
+                    </div>
+                    <button onClick={() => setShowReportModal(false)} className="text-gray-300 hover:text-gray-500 transition"><FaTimes/></button>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">End Date</label>
-                    <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={endDate} onChange={e => setEndDate(e.target.value)}/>
+
+                  <div className="px-6 py-5 space-y-5">
+                    {/* Date range */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Start Date</label>
+                        <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={startDate} onChange={e => setStartDate(e.target.value)}/>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">End Date</label>
+                        <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={endDate} onChange={e => setEndDate(e.target.value)}/>
+                      </div>
+                    </div>
+
+                    {/* Department filter */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter by Department</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {["All", "MENRO / WMO", "Mayor / Dispatch", "Engineering Office"].map(d => {
+                          const meta = d !== "All" ? DEPT[d] : null;
+                          const col  = meta ? DEPT_COLORS[meta.color] : null;
+                          const active = exportDept === d;
+                          return (
+                            <button
+                              key={d}
+                              onClick={() => setExportDept(d)}
+                              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition text-sm ${
+                                active
+                                  ? (col ? col.badge + " border-current" : "bg-gray-900 text-white border-gray-900")
+                                  : "bg-white border-gray-100 hover:border-gray-200 text-gray-700"
+                              }`}
+                            >
+                              {meta && <span className="text-base">{meta.icon}</span>}
+                              <div>
+                                <p className="font-semibold text-xs leading-tight">{d === "All" ? "All Departments" : d}</p>
+                                {meta && <p className="text-[10px] opacity-60">{meta.desc}</p>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {exportDept !== "All" && (
+                        <p className="text-xs text-blue-600 mt-2 bg-blue-50 px-3 py-1.5 rounded-lg">
+                          📄 Will include only {exportDept} reports
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
+                    <button onClick={() => setShowReportModal(false)} className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium">Cancel</button>
+                    <div className="flex gap-2">
+                      {[
+                        { label:"PDF",  fn:generatePDF,  cls:"bg-red-500 hover:bg-red-600 text-white" },
+                        { label:"CSV",  fn:generateCSV,  cls:"bg-emerald-500 hover:bg-emerald-600 text-white" },
+                        { label:"DOCX", fn:generateDOCX, cls:"bg-blue-600 hover:bg-blue-700 text-white" },
+                      ].map(({ label, fn, cls }) => (
+                        <button
+                          key={label}
+                          onClick={() => exportReports(fn)}
+                          className={`text-sm px-4 py-2 rounded-xl font-semibold transition ${cls}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Department filter */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter by Department</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {["All", "MENRO / WMO", "Mayor / Dispatch", "Engineering Office"].map(d => {
-                      const meta = d !== "All" ? DEPT[d] : null;
-                      const col  = meta ? DEPT_COLORS[meta.color] : null;
-                      const active = exportDept === d;
+            {/* ═══════════════ STATUS MODAL ═══════════════ */}
+            {showStatusModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100">
+                    <h3 className="text-lg font-bold text-gray-900">Update Status</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">{genRef(showStatusModal)}</p>
+                  </div>
+                  <div className="px-6 py-5 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Current:</span>
+                      <StatusBadge status={showStatusModal.status} onClick={()=>{}}/>
+                    </div>
+                    <select
+                      value={newStatus}
+                      onChange={e => setNewStatus(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    >
+                      <option value="">Select new status…</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Assigned">Assigned</option>
+                      <option value="Forwarded">Forwarded</option>
+                      <option value="Withdrawn">Withdrawn</option>
+                      <option value="Resolved">Resolved (opens resolution form)</option>
+                    </select>
+                    {newStatus === "Resolved" && (
+                      <p className="text-xs text-green-700 bg-green-50 px-3 py-2 rounded-lg">
+                        ℹ️ A resolution form will open next.
+                      </p>
+                    )}
+                  </div>
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-2 justify-end">
+                    <button onClick={() => { setShowStatusModal(null); setNewStatus(""); }} className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium">Cancel</button>
+                    <button onClick={handleUpdateStatus} className="text-sm px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition font-semibold">Update</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══════════════ FORWARD / BATCH MODAL ═══════════════ */}
+            {showForwardModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <FaShareSquare className="text-indigo-500 text-base"/> Route Report{selectedIds.size > 1 ? "s" : ""}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {selectedIds.size} report{selectedIds.size > 1 ? "s" : ""} will be marked <strong>Forwarded</strong>
+                    </p>
+                  </div>
+                  <div className="px-6 py-5 space-y-2">
+                    {["MENRO / WMO","Mayor / Dispatch","Engineering Office"].map(dept => {
+                      const d = DEPT[dept];
+                      const c = DEPT_COLORS[d.color];
+                      const active = batchDept === dept;
                       return (
                         <button
-                          key={d}
-                          onClick={() => setExportDept(d)}
-                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition text-sm ${
-                            active
-                              ? (col ? col.badge + " border-current" : "bg-gray-900 text-white border-gray-900")
-                              : "bg-white border-gray-100 hover:border-gray-200 text-gray-700"
+                          key={dept}
+                          onClick={() => setBatchDept(dept)}
+                          className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition text-left ${
+                            active ? `${c.badge} border-current shadow-sm` : "bg-white border-gray-100 hover:border-gray-200"
                           }`}
                         >
-                          {meta && <span className="text-base">{meta.icon}</span>}
-                          <div>
-                            <p className="font-semibold text-xs leading-tight">{d === "All" ? "All Departments" : d}</p>
-                            {meta && <p className="text-[10px] opacity-60">{meta.desc}</p>}
+                          <span className="text-xl">{d.icon}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-gray-800">{dept}</p>
+                            <p className="text-xs text-gray-400">{d.desc}</p>
                           </div>
+                          {active && <FaCheckCircle className="text-green-500 shrink-0"/>}
                         </button>
                       );
                     })}
                   </div>
-                  {exportDept !== "All" && (
-                    <p className="text-xs text-blue-600 mt-2 bg-blue-50 px-3 py-1.5 rounded-lg">
-                      📄 Will include only {exportDept} reports
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
-                <button onClick={() => setShowReportModal(false)} className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium">Cancel</button>
-                <div className="flex gap-2">
-                  {[
-                    { label:"PDF",  fn:generatePDF,  cls:"bg-red-500 hover:bg-red-600 text-white" },
-                    { label:"CSV",  fn:generateCSV,  cls:"bg-emerald-500 hover:bg-emerald-600 text-white" },
-                    { label:"DOCX", fn:generateDOCX, cls:"bg-blue-600 hover:bg-blue-700 text-white" },
-                  ].map(({ label, fn, cls }) => (
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-2 justify-end">
                     <button
-                      key={label}
-                      onClick={() => exportReports(fn)}
-                      className={`text-sm px-4 py-2 rounded-xl font-semibold transition ${cls}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══════════════ STATUS MODAL ═══════════════ */}
-        {showStatusModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900">Update Status</h3>
-                <p className="text-xs text-gray-400 mt-0.5">{genRef(showStatusModal)}</p>
-              </div>
-              <div className="px-6 py-5 space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Current:</span>
-                  <StatusBadge status={showStatusModal.status} onClick={()=>{}}/>
-                </div>
-                <select
-                  value={newStatus}
-                  onChange={e => setNewStatus(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="">Select new status…</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Assigned">Assigned</option>
-                  <option value="Withdrawn">Withdrawn</option>
-                  <option value="Resolved">Resolved (opens resolution form)</option>
-                </select>
-                {newStatus === "Resolved" && (
-                  <p className="text-xs text-green-700 bg-green-50 px-3 py-2 rounded-lg">
-                    ℹ️ A resolution form will open next.
-                  </p>
-                )}
-              </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-2 justify-end">
-                <button onClick={() => { setShowStatusModal(null); setNewStatus(""); }} className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium">Cancel</button>
-                <button onClick={handleUpdateStatus} className="text-sm px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition font-semibold">Update</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══════════════ FORWARD / BATCH MODAL ═══════════════ */}
-        {showForwardModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <FaShareSquare className="text-indigo-500 text-base"/> Route Report{selectedIds.size > 1 ? "s" : ""}
-                </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {selectedIds.size} report{selectedIds.size > 1 ? "s" : ""} will be marked <strong>Assigned</strong>
-                </p>
-              </div>
-              <div className="px-6 py-5 space-y-2">
-                {["MENRO / WMO","Mayor / Dispatch","Engineering Office"].map(dept => {
-                  const d = DEPT[dept];
-                  const c = DEPT_COLORS[d.color];
-                  const active = batchDept === dept;
-                  return (
+                      onClick={() => { setShowForwardModal(false); if (!batchMode) { clearSel(); setBatchDept(""); } }}
+                      disabled={forwarding}
+                      className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium"
+                    >Cancel</button>
                     <button
-                      key={dept}
-                      onClick={() => setBatchDept(dept)}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition text-left ${
-                        active ? `${c.badge} border-current shadow-sm` : "bg-white border-gray-100 hover:border-gray-200"
-                      }`}
+                      onClick={handleBatchForward}
+                      disabled={!batchDept || forwarding}
+                      className="text-sm px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-30 transition font-semibold flex items-center gap-2"
                     >
-                      <span className="text-xl">{d.icon}</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-800">{dept}</p>
-                        <p className="text-xs text-gray-400">{d.desc}</p>
-                      </div>
-                      {active && <FaCheckCircle className="text-green-500 shrink-0"/>}
+                      {forwarding
+                        ? <><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"/>Routing…</>
+                        : <><FaShareSquare/> Confirm Route</>}
                     </button>
-                  );
-                })}
+                  </div>
+                </div>
               </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-2 justify-end">
-                <button
-                  onClick={() => { setShowForwardModal(false); if (!batchMode) { clearSel(); setBatchDept(""); } }}
-                  disabled={forwarding}
-                  className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium"
-                >Cancel</button>
-                <button
-                  onClick={handleBatchForward}
-                  disabled={!batchDept || forwarding}
-                  className="text-sm px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-30 transition font-semibold flex items-center gap-2"
-                >
-                  {forwarding
-                    ? <><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"/>Routing…</>
-                    : <><FaShareSquare/> Confirm Route</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* ── Other modals ── */}
-        {showResolveModal && (
-          <ResolveReportModal report={showResolveModal} onClose={() => setShowResolveModal(null)} onSuccess={() => setShowResolveModal(null)}/>
-        )}
-        {selectedReport && (
-          <ReportDetailsModal
-            selectedReport={selectedReport}
-            onClose={() => setSelectedReport(null)}
-            formatDate={ts => ts.toDate().toLocaleDateString()}
-            formatTime={ts => ts.toDate().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
-          />
-        )}
-        {showResolutionModal && (
-          <ResolutionDetailsModal selectedReport={showResolutionModal} onClose={() => setShowResolutionModal(null)}/>
-        )}
-      </div>
-    </>
-  );
-}
+            {/* ── Other modals ── */}
+            {showResolveModal && (
+              <ResolveReportModal report={showResolveModal} onClose={() => setShowResolveModal(null)} onSuccess={() => setShowResolveModal(null)}/>
+            )}
+            {selectedReport && (
+              <ReportDetailsModal
+                selectedReport={selectedReport}
+                onClose={() => setSelectedReport(null)}
+                formatDate={ts => ts.toDate().toLocaleDateString()}
+                formatTime={ts => ts.toDate().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+              />
+            )}
+            {showResolutionModal && (
+              <ResolutionDetailsModal selectedReport={showResolutionModal} onClose={() => setShowResolutionModal(null)}/>
+            )}
+          </div>
+        </>
+      );
+    }
