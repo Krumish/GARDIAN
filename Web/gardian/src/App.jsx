@@ -25,7 +25,7 @@ import { TbReportOff }    from "react-icons/tb";
 import { RiHourglassFill } from "react-icons/ri";
 import { MdPending, MdEngineering, MdLocalShipping } from "react-icons/md";
 import { GiRecycle }      from "react-icons/gi";
-import { FaUserCheck }    from "react-icons/fa";
+import { FaUserCheck, FaShareSquare }    from "react-icons/fa";
 import { FaClockRotateLeft } from "react-icons/fa6";
 import { Link } from "react-router-dom";
 
@@ -221,6 +221,7 @@ export default function App() {
 function Dashboard({ reports, recentReports, loading }) {
   const pending   = reports.filter(r => r.status === "Pending").length;
   const assigned  = reports.filter(r => r.status === "Assigned").length;
+  const forwarded = reports.filter(r => r.status === "Forwarded").length;
   const resolved  = reports.filter(r => r.status === "Resolved").length;
   const withdrawn = reports.filter(r => r.status === "Withdrawn").length;
   const total     = reports.length;
@@ -246,22 +247,30 @@ function Dashboard({ reports, recentReports, loading }) {
       </div>
 
       {/* ── Summary strip ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label:"Pending", val:pending,   color:"text-amber-700", bg:"bg-amber-50", border:"border-amber-200", icon: <FaClockRotateLeft /> },
-          { label:"Assigned",   val:assigned,  color:"text-cyan-700",  bg:"bg-cyan-50",  border:"border-cyan-200",  icon: <FaUserCheck /> },
-          { label:"Resolved",      val:resolved,  color:"text-green-700", bg:"bg-green-50", border:"border-green-200", icon: <FaCheckCircle /> },
-          { label:"Withdrawn",     val:withdrawn, color:"text-gray-500",  bg:"bg-gray-50",  border:"border-gray-200",  icon: <TbReportOff /> },
-          { label:"Total Logs",    val:total,     color:"text-slate-700", bg:"bg-white",    border:"border-slate-200", icon: <FaChartBar /> },
+          { label:"Pending",   val:pending,   color:"text-amber-700", bg:"bg-amber-50", border:"border-amber-200", icon: <FaClockRotateLeft /> },
+          { label:"Assigned",  val:assigned,  color:"text-cyan-700",  bg:"bg-cyan-50",  border:"border-cyan-200",  icon: <FaUserCheck /> },
+          { label:"Forwarded", val:forwarded, color:"text-blue-700",  bg:"bg-blue-50",  border:"border-blue-200",  icon: <FaShareSquare /> },
+          { label:"Resolved",  val:resolved,  color:"text-green-700", bg:"bg-green-50", border:"border-green-200", icon: <FaCheckCircle /> },
+          { label:"Withdrawn", val:withdrawn, color:"text-gray-600",  bg:"bg-gray-50",  border:"border-gray-200",  icon: <TbReportOff /> },
+          { label:"Total Logs",val:total,     color:"text-slate-800", bg:"bg-white",    border:"border-slate-200", icon: <FaChartBar /> },
         ].map(({ label, val, color, bg, border, icon }) => (
-          <div key={label} className={`${bg} border ${border} rounded-xl px-5 py-4 shadow-sm flex flex-col justify-between`}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</p>
-              <span className={`text-lg opacity-50 ${color}`}>{icon}</span>
+          <div 
+            key={label} 
+            className={`${bg} border ${border} rounded-xl px-5 py-4 shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md`}
+          >
+            <div className="flex items-start justify-between mb-3">
+              {/* Monochromatic Label: Matches the card color but slightly faded */}
+              <p className={`text-[11px] font-bold uppercase tracking-wider ${color} opacity-80`}>
+                {label}
+              </p>
+              {/* Full opacity icon: Removed the 'opacity-50' so the icon is crisp and sharp */}
+              <span className={`text-[20px] ${color}`}>{icon}</span>
             </div>
             {loading
-              ? <div className="h-8 w-16 bg-black/5 rounded animate-pulse mt-1"/>
-              : <p className={`text-3xl font-black ${color}`}>{val}</p>
+              ? <div className="h-9 w-16 bg-black/10 rounded animate-pulse"/>
+              : <p className={`text-3xl font-extrabold ${color} tracking-tight`}>{val}</p>
             }
           </div>
         ))}

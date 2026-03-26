@@ -2,22 +2,24 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { collectionGroup, doc, getDoc, updateDoc, writeBatch, onSnapshot } from "firebase/firestore";
 import { db, auth } from "../../firebase";
-import ReportDetailsModal      from './ReportDetailsModal';
-import ResolutionDetailsModal  from './ResolutionDetailsModal';
-import ResolveReportModal      from './ResolveReportModal';
+import ReportDetailsModal     from './ReportDetailsModal';
+import ResolutionDetailsModal from './ResolutionDetailsModal';
+import ResolveReportModal     from './ResolveReportModal';
+import PrintableReport        from "./printablereport";
 import { generatePDF, generateCSV, generateDOCX } from './ReportGenerate';
+import { useReactToPrint } from "react-to-print";
 
 import { TbReportOff } from "react-icons/tb";
 import {
-  FaFilePdf, FaUsers, FaCheckCircle, FaSearch,
+  FaFilePdf, FaCheckCircle, FaSearch,
   FaMapMarkerAlt, FaUser, FaUserCheck, FaShareSquare,
   FaRegSquare, FaCheckSquare, FaChevronDown, FaChevronUp,
-  FaFilter, FaSortAmountDown, FaTimes, FaChartBar,
+  FaFilter, FaSortAmountDown, FaTimes, FaChartBar, FaPrint,
 } from "react-icons/fa";
 import { FaClockRotateLeft } from "react-icons/fa6";
-import { RiHourglassFill }   from "react-icons/ri";
-import { MdAssignment, MdEngineering, MdLocalShipping } from "react-icons/md";
-import { GiRecycle }         from "react-icons/gi";
+import { RiHourglassFill }  from "react-icons/ri";
+import { MdEngineering, MdLocalShipping } from "react-icons/md";
+import { GiRecycle }        from "react-icons/gi";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const STYLES = `
@@ -37,42 +39,50 @@ const STYLES = `
 
 // ── Department config ─────────────────────────────────────────────────────────
 function getAssignedDepartment(issueType) {
-  if (["Waste Management", "Solid Waste"].includes(issueType))           return "MENRO / WMO";
-  if (["Drainage", "Road Blockage"].includes(issueType))                 return "Mayor / Dispatch";
+  if (["Waste Management", "Solid Waste"].includes(issueType))                      return "MENRO / WMO";
+  if (["Drainage", "Road Blockage"].includes(issueType))                            return "Mayor / Dispatch";
   if (["Pothole", "Manhole", "Road Markings", "Road Surface"].includes(issueType)) return "Engineering Office";
   return "Unassigned";
 }
 const getDept = (r) => r.assignedDepartment || getAssignedDepartment(r.issueType);
 
 const DEPT = {
-  // Teal 
-  "MENRO / WMO":       { color:"teal",   icon:<GiRecycle className="shrink-0"/>,      desc:"Waste & environmental" },
-  // Indigo
-  "Mayor / Dispatch":  { color:"indigo", icon:<MdLocalShipping className="shrink-0"/>, desc:"Drainage, road blockages" },
-  // Orange
-  "Engineering Office":{ color:"orange", icon:<MdEngineering className="shrink-0"/>,   desc:"Potholes, manholes, markings" },
-  // Gray
-  "Unassigned":        { color:"gray",   icon:<MdAssignment className="shrink-0"/>,    desc:"Needs routing" },
+  "MENRO / WMO":        { color:"teal",   icon:<GiRecycle className="shrink-0"/>,       desc:"Waste & environmental" },
+  "Mayor / Dispatch":   { color:"indigo", icon:<MdLocalShipping className="shrink-0"/>,  desc:"Drainage, road blockages" },
+  "Engineering Office": { color:"orange", icon:<MdEngineering className="shrink-0"/>,    desc:"Potholes, manholes, markings" },
 };
 
 const DEPT_COLORS = {
-  teal:   { badge:"bg-teal-50 text-teal-700 border-teal-200",     dot:"bg-teal-500",   ring:"ring-teal-400"   },
-  indigo: { badge:"bg-indigo-50 text-indigo-700 border-indigo-200", dot:"bg-indigo-500", ring:"ring-indigo-400" },
-  orange: { badge:"bg-orange-50 text-orange-700 border-orange-200", dot:"bg-orange-500", ring:"ring-orange-400" },
-  gray:   { badge:"bg-gray-50 text-gray-500 border-gray-200",      dot:"bg-gray-400",   ring:"ring-gray-300"   },
+  teal:   { badge:"bg-teal-50 text-teal-700 border-teal-200",       dot:"bg-teal-500"   },
+  indigo: { badge:"bg-indigo-50 text-indigo-700 border-indigo-200", dot:"bg-indigo-500" },
+  orange: { badge:"bg-orange-50 text-orange-700 border-orange-200", dot:"bg-orange-500" },
+  gray:   { badge:"bg-gray-50 text-gray-500 border-gray-200",       dot:"bg-gray-400"   },
 };
 
-// Status colors remain semantic (traffic-light logic — do NOT change these)
 const STATUS_CONFIG = {
-  Pending:   { cls:"bg-amber-50 text-amber-700 border border-amber-200",   icon:<RiHourglassFill className="text-amber-500 shrink-0"/> },
-  Assigned:  { cls:"bg-cyan-50 text-cyan-700 border border-cyan-200",      icon:<FaUserCheck className="text-cyan-500 shrink-0"/> },
-  Withdrawn: { cls:"bg-gray-50 text-gray-600 border border-gray-200",      icon:<TbReportOff className="text-gray-400 shrink-0"/> },
-  Resolved:  { cls:"bg-green-50 text-green-700 border border-green-200",   icon:<FaCheckCircle className="text-green-500 shrink-0"/> },
+  Pending:   { cls:"bg-amber-50 text-amber-700 border border-amber-200",  icon:<RiHourglassFill className="text-amber-500 shrink-0"/> },
+  Assigned:  { cls:"bg-cyan-50 text-cyan-700 border border-cyan-200",     icon:<FaUserCheck className="text-cyan-500 shrink-0"/> },
+  Forwarded: { cls:"bg-blue-50 text-blue-700 border border-blue-200",     icon:<FaShareSquare className="text-blue-500 shrink-0"/> },
+  Resolved:  { cls:"bg-green-50 text-green-700 border border-green-200",  icon:<FaCheckCircle className="text-green-500 shrink-0"/> },
+  Withdrawn: { cls:"bg-gray-50 text-gray-600 border border-gray-200",     icon:<TbReportOff className="text-gray-400 shrink-0"/> },
 };
 
+// ── Shared helpers ────────────────────────────────────────────────────────────
+const genRef = (r) => {
+  if (!r?.id) return "REF-00000000-XXXXX";
+  const ts = r.uploadedAt;
+  const d  = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+  const ds = d && !isNaN(d) ? d.toISOString().slice(0,10).replace(/-/g,"") : "00000000";
+  return `REF-${ds}-${r.id.slice(-5).toUpperCase()}`;
+};
+const fmtDate = (ts) => { if (!ts) return "-"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); };
+const fmtTime = (ts) => { if (!ts) return "-"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}); };
+const getType = (r) => r.yolo?.drainage_count > 0 ? "Drainage" : r.issueType || "Unknown";
+
+// ── Small display components ──────────────────────────────────────────────────
 function DeptBadge({ dept }) {
   const d = DEPT[dept] || DEPT["Unassigned"];
-  const c = DEPT_COLORS[d.color];
+  const c = DEPT_COLORS[d?.color] || DEPT_COLORS.gray;
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium border ${c.badge}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`}/>
@@ -84,9 +94,61 @@ function DeptBadge({ dept }) {
 function StatusBadge({ status, onClick }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.Pending;
   return (
-    <button onClick={onClick} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium cursor-pointer hover:opacity-80 transition ${cfg.cls}`}>
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium cursor-pointer hover:opacity-80 transition ${cfg.cls}`}
+    >
       {cfg.icon}{status}
     </button>
+  );
+}
+
+// ── ActionButtons ─────────────
+function ActionButtons({ report, batchMode, onView, onPrint, onRoute, onResolution }) {
+  const isPending  = report.status === "Pending";
+  const isResolved = report.status === "Resolved";
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {/* View — always visible */}
+      <button
+        onClick={onView}
+        className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition"
+      >
+        View
+      </button>
+
+      {/* Route — only for pending reports, outside batch mode */}
+      {isPending && !batchMode && (
+        <button
+          onClick={onRoute}
+          className="text-xs px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium transition flex items-center gap-1"
+        >
+          <FaShareSquare className="text-[9px]"/> Route
+        </button>
+      )}
+
+      {/* Print — only after routing (Forwarded or Assigned), outside batch mode */}
+      {!batchMode && (report.status === "Forwarded" || report.status === "Assigned") && (
+        <button
+          onClick={onPrint}
+          title="Print Transmittal Form"
+          className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-200 text-slate-700 font-medium transition flex items-center gap-1"
+        >
+          <FaPrint className="text-[10px]"/> Print
+        </button>
+      )}
+
+      {/* Resolution — only for resolved reports */}
+      {isResolved && (
+        <button
+          onClick={onResolution}
+          className="text-xs px-2.5 py-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 font-medium transition"
+        >
+          Resolution
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -95,44 +157,78 @@ export default function Reports() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [reports, setReports]       = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState("");
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ── Table UI state ────────────────────────────────────────────────────────
+  const [search, setSearch]             = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [typeFilter, setTypeFilter]   = useState("");
-  const [deptFilter, setDeptFilter]   = useState("All");
-  const [sortBy, setSortBy]           = useState("dateDesc");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [typeFilter, setTypeFilter]     = useState("");
+  const [deptFilter, setDeptFilter]     = useState("All");
+  const [sortBy, setSortBy]             = useState("dateDesc");
+  const [filtersOpen, setFiltersOpen]   = useState(false);
 
-  // Modals
-  const [selectedReport, setSelectedReport]   = useState(null);
-  const [showStatusModal, setShowStatusModal] = useState(null);
-  const [showResolveModal, setShowResolveModal] = useState(null);
+  // ── Modals ────────────────────────────────────────────────────────────────
+  const [selectedReport, setSelectedReport]           = useState(null);
+  const [showStatusModal, setShowStatusModal]         = useState(null);
+  const [showResolveModal, setShowResolveModal]       = useState(null);
   const [showResolutionModal, setShowResolutionModal] = useState(null);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showForwardModal, setShowForwardModal] = useState(false);
-  const [newStatus, setNewStatus]     = useState("");
+  const [showReportModal, setShowReportModal]         = useState(false);
+  const [newStatus, setNewStatus]                     = useState("");
 
-  // Report generation
+  // ── Route modal state ─────────────────────────────────────────────────────
+  const [showRouteModal, setShowRouteModal]     = useState(false);
+  const [batchAssignments, setBatchAssignments] = useState({});
+  const [routing, setRouting]                   = useState(false);
+
+  // ── Report generation ──────────────────────────────────────────────────────
   const [startDate, setStartDate]   = useState("");
   const [endDate, setEndDate]       = useState("");
   const [exportDept, setExportDept] = useState("All");
 
-  // Batch
-  const [batchMode, setBatchMode]   = useState(false);
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [batchDept, setBatchDept]   = useState("");
-  const [forwarding, setForwarding] = useState(false);
+  // ── Batch modes ───────────────────────────────────────────────────────────
+  // batchMode: null | "forward" | "print"
+  const [batchMode, setBatchMode]           = useState(null);
+  // forward-batch: only pending reports
+  const [selectedIds, setSelectedIds]       = useState(new Set());
+  // print-batch: forwarded or assigned reports
+  const [printSelectedIds, setPrintSelectedIds] = useState(new Set());
 
-  // Highlight
+  // ── Highlight / scroll ────────────────────────────────────────────────────
   const [highlightedId, setHighlightedId] = useState(null);
   const rowRefs  = useRef({});
   const scrolled = useRef(null);
+
+  // ── Print refs ────────────────────────────────────────────────────────────
+  const singlePrintRef = useRef();
+  const batchPrintRef  = useRef();
+  const [reportToPrint, setReportToPrint] = useState(null);
+
+  // For single print: the one report being printed
+  // For batch print: either selectedIds (after routing) or printSelectedIds (manual print batch)
+  const [batchPrintSource, setBatchPrintSource] = useState("forward"); // "forward" | "print"
+
+  const selectedReportsData = batchPrintSource === "print"
+    ? reports.filter(r => printSelectedIds.has(r.id))
+    : reports.filter(r => selectedIds.has(r.id));
+
+  const handleSinglePrint = useReactToPrint({
+    contentRef: singlePrintRef,
+    documentTitle: `GARDIAN_Report_${reportToPrint?.id || "Single"}`,
+    onAfterPrint: () => setReportToPrint(null),
+  });
+
+  const handleBatchPrint = useReactToPrint({
+    contentRef: batchPrintRef,
+    documentTitle: `GARDIAN_Batch_Report_${new Date().toISOString().slice(0,10)}`,
+  });
 
   // ── Counts ────────────────────────────────────────────────────────────────
   const counts = {
     pending:   reports.filter(r => r.status === "Pending").length,
     assigned:  reports.filter(r => r.status === "Assigned").length,
+    forwarded: reports.filter(r => r.status === "Forwarded").length,
     resolved:  reports.filter(r => r.status === "Resolved").length,
     withdrawn: reports.filter(r => r.status === "Withdrawn").length,
     total:     reports.length,
@@ -142,36 +238,30 @@ export default function Reports() {
     Object.keys(DEPT).map(d => [d, reports.filter(r => r.status === "Pending" && getDept(r) === d).length])
   );
 
-  // ── URL highlight ──────────────────────────────────────────────────────────
+  // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const id = new URLSearchParams(location.search).get("highlight");
     if (id) { setHighlightedId(id); navigate("/reports", { replace: true }); }
   }, [location.search, navigate]);
 
   useEffect(() => {
+    if (reportToPrint) {
+      const t = setTimeout(() => handleSinglePrint(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [reportToPrint]);
+
+  useEffect(() => {
     if (!highlightedId || scrolled.current === highlightedId) return;
     const el = rowRefs.current[highlightedId];
     if (el) {
       scrolled.current = highlightedId;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior:"smooth", block:"center" });
       el.classList.add("row-flash");
       const t = setTimeout(() => { el.classList.remove("row-flash"); setHighlightedId(null); scrolled.current = null; }, 2200);
       return () => clearTimeout(t);
     }
   }, [highlightedId, reports]);
-
-  // ── Fetch ─────────────────────────────────────────────────────────────────
-  const genRef = (r) => {
-    if (!r?.id) return "REF-00000000-XXXXX";
-    const ts = r.uploadedAt;
-    const d  = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
-    const ds = d && !isNaN(d) ? d.toISOString().slice(0,10).replace(/-/g,"") : "00000000";
-    return `REF-${ds}-${r.id.slice(-5).toUpperCase()}`;
-  };
-
-  const getType = (r) => r.yolo?.drainage_count > 0 ? "Drainage" : r.issueType || "Unknown";
-  const fmtDate = (ts) => { if (!ts) return "-"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); };
-  const fmtTime = (ts) => { if (!ts) return "-"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}); };
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -183,7 +273,7 @@ export default function Reports() {
           const userId = d.ref.parent.parent?.id || "unknown";
           let userDetails = null;
           try { const u = await getDoc(doc(db,"users",userId)); if (u.exists()) userDetails = u.data(); } catch(_){}
-          return { id: d.id, userId, userDetails, docRef: d.ref, ...d.data() };
+          return { id:d.id, userId, userDetails, docRef:d.ref, ...d.data() };
         }));
         all.sort((a,b) => (b.uploadedAt?.toDate?.() || new Date(0)) - (a.uploadedAt?.toDate?.() || new Date(0)));
         setReports(all);
@@ -193,11 +283,11 @@ export default function Reports() {
     );
   }, []);
 
-  // ── Filter ────────────────────────────────────────────────────────────────
+  // ── Filter / sort ─────────────────────────────────────────────────────────
   const filtered = reports
     .filter(r => {
       const s = search.toLowerCase();
-      return !s || [r.id, r.userDetails?.firstName, r.userDetails?.lastName,
+      return !s || [r.id, genRef(r), r.userDetails?.firstName, r.userDetails?.lastName,
         r.userDetails?.barangay, r.status, getType(r), getDept(r)]
         .some(v => (v||"").toLowerCase().includes(s));
     })
@@ -212,53 +302,126 @@ export default function Reports() {
       return 0;
     });
 
-  const forwardable = filtered.filter(r => r.status === "Pending");
+  // Reports eligible for each batch mode (from filtered list)
+  const forwardableFiltered  = filtered.filter(r => r.status === "Pending");
+  const printableFiltered    = filtered.filter(r => r.status === "Forwarded" || r.status === "Assigned");
+
   const activeFilterCount = [statusFilter, typeFilter, deptFilter !== "All" ? deptFilter : ""].filter(Boolean).length;
 
-  // ── Selection ─────────────────────────────────────────────────────────────
-  const toggleSel    = (id) => setSelectedIds(p => { const n = new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
-  const selectAll    = ()   => setSelectedIds(new Set(forwardable.map(r=>r.id)));
-  const clearSel     = ()   => setSelectedIds(new Set());
-  const allSelected  = forwardable.length > 0 && selectedIds.size === forwardable.length;
+  // ── Selection helpers — forward batch ─────────────────────────────────────
+  const toggleSel        = (id) => setSelectedIds(p => { const n = new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
+  const selectAllForward = ()   => setSelectedIds(new Set(forwardableFiltered.map(r=>r.id)));
+  const clearSel         = ()   => setSelectedIds(new Set());
+  const allForwardSelected = forwardableFiltered.length > 0 && forwardableFiltered.every(r => selectedIds.has(r.id));
 
-  // ── Actions ───────────────────────────────────────────────────────────────
-  const handleUpdateStatus = async () => {
-    if (!showStatusModal || !newStatus) return;
-    if (newStatus === "Resolved") { setShowResolveModal(showStatusModal); setShowStatusModal(null); setNewStatus(""); return; }
-    try {
-      const ref = showStatusModal.docRef?.id ? showStatusModal.docRef : doc(db,"users",showStatusModal.userId,"uploads",showStatusModal.id);
-      await updateDoc(ref, { status: newStatus });
-      alert("✅ Status updated!"); setShowStatusModal(null); setNewStatus("");
-    } catch(e) { console.error(e); alert("Failed to update."); }
+  // ── Selection helpers — print batch ──────────────────────────────────────
+  const togglePrintSel      = (id) => setPrintSelectedIds(p => { const n = new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
+  const selectAllPrint      = ()   => setPrintSelectedIds(new Set(printableFiltered.map(r=>r.id)));
+  const clearPrintSel       = ()   => setPrintSelectedIds(new Set());
+  const allPrintSelected    = printableFiltered.length > 0 && printableFiltered.every(r => printSelectedIds.has(r.id));
+
+  // ── Batch mode toggle helpers ─────────────────────────────────────────────
+  const enterForwardMode = () => { setBatchMode("forward"); clearSel(); clearPrintSel(); };
+  const enterPrintMode   = () => { setBatchMode("print");   clearSel(); clearPrintSel(); };
+  const exitBatchMode    = () => { setBatchMode(null);      clearSel(); clearPrintSel(); };
+
+  // ── UNIFIED openRouteModal ────────────────────────────────────────────────
+  const openRouteModal = (report = null) => {
+    const targetIds = report ? new Set([report.id]) : selectedIds;
+    const initial   = {};
+
+    reports
+      .filter(r => targetIds.has(r.id))
+      .forEach(r => {
+        initial[r.id] = r.assignedDepartment || (report ? getAssignedDepartment(r.issueType) : "");
+      });
+
+    if (report) setSelectedIds(targetIds);
+    setBatchAssignments(initial);
+    setShowRouteModal(true);
   };
 
-  const handleBatchForward = async () => {
-    if (!batchDept || selectedIds.size === 0) return;
-    if (!window.confirm(`Forward ${selectedIds.size} report(s) to ${batchDept}?`)) return;
-    setForwarding(true);
+  const closeRouteModal = () => {
+    setShowRouteModal(false);
+    setBatchAssignments({});
+    if (batchMode !== "forward") clearSel();
+  };
+
+  // ── Route → commit + print ─────────────────────────────────────────────────
+  const handleFinalizeBatch = async () => {
+    const allAssigned = Object.values(batchAssignments).every(d => d !== "");
+    if (!allAssigned) return alert("Please assign a department to every report before routing.");
+
+    const count = Object.keys(batchAssignments).length;
+    if (!window.confirm(`Route ${count} report(s)?`)) return;
+
+    setRouting(true);
     try {
       const items = reports.filter(r => selectedIds.has(r.id));
       const CHUNK = 499;
       for (let i = 0; i < items.length; i += CHUNK) {
         const batch = writeBatch(db);
         items.slice(i, i+CHUNK).forEach(r => {
-          const ref = r.docRef?.id ? r.docRef : doc(db,"users",r.userId,"uploads",r.id);
-          batch.update(ref, { assignedDepartment: batchDept, status: "Assigned", forwardedAt: new Date().toISOString() });
+          const dept = batchAssignments[r.id];
+          const ref  = r.docRef?.id ? r.docRef : doc(db,"users",r.userId,"uploads",r.id);
+          batch.update(ref, { assignedDepartment:dept, status:"Forwarded", forwardedAt:new Date().toISOString() });
         });
         await batch.commit();
       }
-      alert(`✅ ${selectedIds.size} report(s) forwarded to ${batchDept}.`);
-      clearSel(); setShowForwardModal(false); setBatchDept(""); setBatchMode(false);
-    } catch(e) { console.error(e); alert("Failed."); }
-    finally { setForwarding(false); }
+
+      const updatedItems = items.map(r => ({ ...r, assignedDepartment:batchAssignments[r.id], status:"Forwarded" }));
+
+      closeRouteModal();
+
+      // Single → single transmittal; multiple → batch print
+      if (updatedItems.length === 1) {
+        setReportToPrint(updatedItems[0]);
+      } else {
+        // Use the forward-selection as the print source
+        setBatchPrintSource("forward");
+        setTimeout(() => handleBatchPrint(), 50);
+      }
+
+      clearSel();
+      if (batchMode === "forward") setBatchMode(null);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to route. Please try again.");
+    } finally {
+      setRouting(false);
+    }
+  };
+
+  // ── Print-batch execute ───────────────────────────────────────────────────
+  const handleExecuteBatchPrint = () => {
+    if (printSelectedIds.size === 0) return;
+    setBatchPrintSource("print");
+    setTimeout(() => handleBatchPrint(), 50);
+  };
+
+  // ── Status update ─────────────────────────────────────────────────────────
+  const handleUpdateStatus = async () => {
+    if (!showStatusModal || !newStatus) return;
+    if (newStatus === "Resolved") {
+      setShowResolveModal(showStatusModal);
+      setShowStatusModal(null);
+      setNewStatus("");
+      return;
+    }
+    try {
+      const ref = showStatusModal.docRef?.id
+        ? showStatusModal.docRef
+        : doc(db,"users",showStatusModal.userId,"uploads",showStatusModal.id);
+      await updateDoc(ref, { status:newStatus });
+      alert("✅ Status updated!");
+      setShowStatusModal(null);
+      setNewStatus("");
+    } catch(e) { console.error(e); alert("Failed to update."); }
   };
 
   // ── Export ────────────────────────────────────────────────────────────────
   const exportReports = (fn) => {
-    // filter reports by dept if selected
-    const toExport = exportDept === "All"
-      ? reports
-      : reports.filter(r => getDept(r) === exportDept);
+    const toExport = exportDept === "All" ? reports : reports.filter(r => getDept(r) === exportDept);
     fn(toExport, startDate, endDate);
     setShowReportModal(false);
   };
@@ -267,28 +430,60 @@ export default function Reports() {
   return (
     <>
       <style>{STYLES}</style>
+
+      {/* Hidden print targets */}
+      <div style={{ position:"absolute", top:"-9999px", left:"-9999px", visibility:"hidden" }}>
+        <PrintableReport ref={batchPrintRef} reports={selectedReportsData}/>
+      </div>
+      <div style={{ position:"absolute", top:"-9999px", left:"-9999px", visibility:"hidden" }}>
+        {reportToPrint && <PrintableReport ref={singlePrintRef} reports={[reportToPrint]}/>}
+      </div>
+
       <div className="p-6 bg-gray-50 min-h-screen space-y-5">
 
         {/* ── Page header ── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Reports</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {batchMode && (
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Reports</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+
+            {/* Active batch pill */}
+            {batchMode === "forward" && (
               <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full font-semibold">
-                {selectedIds.size} selected
+                {selectedIds.size} selected to forward
               </span>
             )}
+            {batchMode === "print" && (
+              <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full font-semibold">
+                {printSelectedIds.size} selected to print
+              </span>
+            )}
+
+            {/* Batch Forward button */}
             <button
-              onClick={() => { setBatchMode(v=>!v); clearSel(); }}
+              onClick={batchMode === "forward" ? exitBatchMode : enterForwardMode}
               className={`flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg font-medium transition ${
-                batchMode ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                batchMode === "forward"
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                  : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
               }`}
             >
               <FaShareSquare className="text-xs"/>
-              {batchMode ? "Exit Batch" : "Batch Forward"}
+              {batchMode === "forward" ? "Exit Forward" : "Batch Forward"}
             </button>
+
+            {/* Batch Print button */}
+            <button
+              onClick={batchMode === "print" ? exitBatchMode : enterPrintMode}
+              className={`flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg font-medium transition ${
+                batchMode === "print"
+                  ? "bg-slate-700 text-white hover:bg-slate-800"
+                  : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              <FaPrint className="text-xs"/>
+              {batchMode === "print" ? "Exit Print" : "Batch Print"}
+            </button>
+
             <button
               onClick={() => setShowReportModal(true)}
               className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg font-medium bg-red-700 text-white hover:bg-red-800 transition"
@@ -299,28 +494,32 @@ export default function Reports() {
         </div>
 
         {/* ── Summary strip ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label:"Pending",    val:counts.pending,   color:"text-amber-700", bg:"bg-amber-50",  border:"border-amber-200",  icon:<FaClockRotateLeft/>    },
-            { label:"Assigned",   val:counts.assigned,  color:"text-cyan-700",  bg:"bg-cyan-50",   border:"border-cyan-200",   icon:<FaUserCheck />        },
-            { label:"Resolved",   val:counts.resolved,  color:"text-green-700", bg:"bg-green-50",  border:"border-green-200",  icon:<FaCheckCircle />      },
-            { label:"Withdrawn",  val:counts.withdrawn, color:"text-gray-500",  bg:"bg-gray-50",   border:"border-gray-200",   icon:<TbReportOff />        },
-            { label:"Total Logs", val:counts.total,     color:"text-slate-700", bg:"bg-white",     border:"border-slate-200",  icon:<FaChartBar />         },
+            { label:"Pending",    val:counts.pending,   color:"text-amber-700", bg:"bg-amber-50",  border:"border-amber-200",  icon:<FaClockRotateLeft /> },
+            { label:"Assigned",   val:counts.assigned,  color:"text-cyan-700",  bg:"bg-cyan-50",   border:"border-cyan-200",   icon:<FaUserCheck /> },
+            { label:"Forwarded",  val:counts.forwarded, color:"text-blue-700",  bg:"bg-blue-50",   border:"border-blue-200",   icon:<FaShareSquare /> },
+            { label:"Resolved",   val:counts.resolved,  color:"text-green-700", bg:"bg-green-50",  border:"border-green-200",  icon:<FaCheckCircle /> },
+            { label:"Withdrawn",  val:counts.withdrawn, color:"text-gray-600",  bg:"bg-gray-50",   border:"border-gray-200",   icon:<TbReportOff /> },
+            { label:"Total Logs", val:counts.total,     color:"text-slate-800", bg:"bg-white",     border:"border-slate-200",  icon:<FaChartBar /> },
           ].map(({ label, val, color, bg, border, icon }) => (
-            <div key={label} className={`${bg} border ${border} rounded-xl px-5 py-4 shadow-sm flex flex-col justify-between`}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</p>
-                <span className={`text-lg opacity-50 ${color}`}>{icon}</span>
+            <div key={label} className={`${bg} border ${border} rounded-xl px-5 py-4 shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md`}>
+              <div className="flex items-start justify-between mb-3">
+                <p className={`text-[11px] font-bold uppercase tracking-wider ${color} opacity-80`}>{label}</p>
+                <span className={`text-[20px] ${color}`}>{icon}</span>
               </div>
-              <p className={`text-3xl font-black ${color}`}>{val}</p>
+              {loading
+                ? <div className="h-9 w-16 bg-black/10 rounded animate-pulse"/>
+                : <p className={`text-3xl font-extrabold ${color} tracking-tight`}>{val}</p>
+              }
             </div>
           ))}
         </div>
 
         {/* ── Dept pending tiles ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {Object.entries(DEPT).map(([dept, d]) => {
-            const c = DEPT_COLORS[d.color];
+            const c      = DEPT_COLORS[d.color];
             const active = deptFilter === dept;
             return (
               <button
@@ -346,7 +545,7 @@ export default function Reports() {
         {/* ── Table card ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
 
-          {/* Table toolbar */}
+          {/* Toolbar */}
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3 flex-wrap">
 
             {/* Search */}
@@ -400,30 +599,42 @@ export default function Reports() {
               </select>
             </div>
 
-            <span className="ml-auto text-xs text-gray-400">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
+            <span className="ml-auto text-xs text-gray-400">{filtered.length} result{filtered.length !== 1?"s":""}</span>
 
-            {/* Batch controls */}
-            {batchMode && (
+            {/* ── Batch Forward controls ── */}
+            {batchMode === "forward" && (
               <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
-                <button onClick={allSelected ? clearSel : selectAll} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                  {allSelected ? "Deselect all" : "Select all pending"}
-                </button>
-                <select
-                  value={batchDept}
-                  onChange={e => setBatchDept(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                >
-                  <option value="">Route to…</option>
-                  <option value="MENRO / WMO">MENRO / WMO</option>
-                  <option value="Mayor / Dispatch">Mayor / Dispatch</option>
-                  <option value="Engineering Office">Engineering Office</option>
-                </select>
                 <button
-                  onClick={() => setShowForwardModal(true)}
-                  disabled={selectedIds.size === 0 || !batchDept}
-                  className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed font-semibold transition"
+                  onClick={allForwardSelected ? clearSel : selectAllForward}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
                 >
-                  Forward ({selectedIds.size})
+                  {allForwardSelected ? "Deselect all" : "Select all pending"}
+                </button>
+                <button
+                  onClick={() => openRouteModal()}
+                  disabled={selectedIds.size === 0}
+                  className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed font-semibold transition flex items-center gap-1.5"
+                >
+                  <FaShareSquare/> Route ({selectedIds.size})
+                </button>
+              </div>
+            )}
+
+            {/* ── Batch Print controls ── */}
+            {batchMode === "print" && (
+              <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
+                <button
+                  onClick={allPrintSelected ? clearPrintSel : selectAllPrint}
+                  className="text-xs text-slate-600 hover:text-slate-800 font-medium"
+                >
+                  {allPrintSelected ? "Deselect all" : "Select all"}
+                </button>
+                <button
+                  onClick={handleExecuteBatchPrint}
+                  disabled={printSelectedIds.size === 0}
+                  className="text-xs px-3 py-1.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed font-semibold transition flex items-center gap-1.5"
+                >
+                  <FaPrint/> Print ({printSelectedIds.size})
                 </button>
               </div>
             )}
@@ -432,38 +643,24 @@ export default function Reports() {
           {/* Collapsible filters */}
           {filtersOpen && (
             <div className="slide-down px-5 py-3 bg-gray-50 border-b border-gray-100 flex flex-wrap gap-3 items-center">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</label>
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
-                  <option value="">All</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Assigned">Assigned</option>
-                  <option value="Resolved">Resolved</option>
-                  <option value="Withdrawn">Withdrawn</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</label>
-                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
-                  <option value="">All</option>
-                  <option value="Drainage">Drainage</option>
-                  <option value="Pothole">Pothole</option>
-                  <option value="Manhole">Manhole</option>
-                  <option value="Road Markings">Road Markings</option>
-                  <option value="Road Blockage">Road Blockage</option>
-                  <option value="Waste Management">Waste Management</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Department</label>
-                <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
-                  <option value="All">All</option>
-                  <option value="MENRO / WMO">MENRO / WMO</option>
-                  <option value="Mayor / Dispatch">Mayor / Dispatch</option>
-                  <option value="Engineering Office">Engineering Office</option>
-                  <option value="Unassigned">Unassigned</option>
-                </select>
-              </div>
+              {[
+                { label:"Status", value:statusFilter, set:setStatusFilter, options:["Pending","Assigned","Forwarded","Resolved","Withdrawn"] },
+                { label:"Type",   value:typeFilter,   set:setTypeFilter,   options:["Drainage","Pothole","Manhole","Road Markings","Road Blockage","Waste Management"] },
+                { label:"Dept",   value:deptFilter === "All" ? "" : deptFilter, set:(v) => setDeptFilter(v||"All"),
+                  options:["MENRO / WMO","Mayor / Dispatch","Engineering Office","Unassigned"] },
+              ].map(({ label, value, set, options }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</label>
+                  <select
+                    value={value}
+                    onChange={e => set(e.target.value)}
+                    className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="">All</option>
+                    {options.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              ))}
               {activeFilterCount > 0 && (
                 <button
                   onClick={() => { setStatusFilter(""); setTypeFilter(""); setDeptFilter("All"); }}
@@ -475,20 +672,26 @@ export default function Reports() {
             </div>
           )}
 
+          {/* ── Batch Print mode banner ── */}
+          {batchMode === "print" && (
+            <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+              <FaPrint className="text-slate-400 text-xs shrink-0"/>
+              <p className="text-xs text-slate-500">
+                Select <span className="font-semibold">Forwarded</span> or <span className="font-semibold">Assigned</span> reports to print transmittals.
+                Other statuses cannot be selected.
+              </p>
+            </div>
+          )}
+
           {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
                   {batchMode && <th className="px-4 py-3 w-10"/>}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Reference</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Reporter</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Routed To</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Location</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Submitted</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+                  {["Reference","Reporter","Type","Routed To","Location","Submitted","Status","Actions"].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -502,34 +705,73 @@ export default function Reports() {
                     </tr>
                   ))
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={batchMode?9:8} className="text-center py-16 text-gray-300">
-                    <FaSearch className="mx-auto text-3xl mb-2"/>
-                    <p className="text-sm font-medium text-gray-400">No reports match your filters</p>
-                  </td></tr>
+                  <tr>
+                    <td colSpan={batchMode?9:8} className="text-center py-16 text-gray-300">
+                      <FaSearch className="mx-auto text-3xl mb-2"/>
+                      <p className="text-sm font-medium text-gray-400">No reports match your filters</p>
+                    </td>
+                  </tr>
                 ) : filtered.map((r) => {
-                  const dept      = getDept(r);
-                  const isPending = r.status === "Pending";
-                  const isChecked = selectedIds.has(r.id);
+                  const dept = getDept(r);
+
+                  // Forward batch eligibility
+                  const isForwardEligible = r.status === "Pending";
+                  const isForwardChecked  = selectedIds.has(r.id);
+
+                  // Print batch eligibility
+                  const isPrintEligible   = r.status === "Forwarded" || r.status === "Assigned";
+                  const isPrintChecked    = printSelectedIds.has(r.id);
+
+                  // Row click behavior depends on mode
+                  const handleRowClick = () => {
+                    if (batchMode === "forward" && isForwardEligible) toggleSel(r.id);
+                    if (batchMode === "print"   && isPrintEligible)   togglePrintSel(r.id);
+                  };
+
+                  const rowHighlighted = highlightedId === r.id;
+                  const rowChecked     = batchMode === "forward" ? isForwardChecked : batchMode === "print" ? isPrintChecked : false;
 
                   return (
                     <tr
                       key={r.id}
                       ref={el => { if (el) rowRefs.current[r.id] = el; else delete rowRefs.current[r.id]; }}
-                      onClick={() => batchMode && isPending && toggleSel(r.id)}
+                      onClick={handleRowClick}
                       className={`transition-colors ${
-                        highlightedId === r.id ? "ring-2 ring-inset ring-blue-400 bg-blue-50" :
-                        isChecked ? "bg-indigo-50" :
-                        batchMode && isPending ? "hover:bg-indigo-50 cursor-pointer" : "hover:bg-gray-50"
+                        rowHighlighted
+                          ? "ring-2 ring-inset ring-blue-400 bg-blue-50"
+                          : rowChecked && batchMode === "forward"
+                            ? "bg-indigo-50"
+                            : rowChecked && batchMode === "print"
+                              ? "bg-slate-100"
+                              : batchMode === "forward" && isForwardEligible
+                                ? "hover:bg-indigo-50 cursor-pointer"
+                                : batchMode === "print" && isPrintEligible
+                                  ? "hover:bg-slate-50 cursor-pointer"
+                                  : "hover:bg-gray-50"
                       }`}
                     >
-                      {/* Checkbox */}
+                      {/* Batch checkbox */}
                       {batchMode && (
                         <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
-                          {isPending ? (
-                            <button onClick={() => toggleSel(r.id)} className="text-indigo-400 hover:text-indigo-600">
-                              {isChecked ? <FaCheckSquare className="text-base text-indigo-600"/> : <FaRegSquare className="text-base"/>}
-                            </button>
-                          ) : <FaRegSquare className="text-base text-gray-200"/>}
+                          {batchMode === "forward" ? (
+                            isForwardEligible ? (
+                              <button onClick={() => toggleSel(r.id)} className="text-indigo-400 hover:text-indigo-600">
+                                {isForwardChecked
+                                  ? <FaCheckSquare className="text-base text-indigo-600"/>
+                                  : <FaRegSquare className="text-base"/>
+                                }
+                              </button>
+                            ) : <FaRegSquare className="text-base text-gray-200"/>
+                          ) : (
+                            isPrintEligible ? (
+                              <button onClick={() => togglePrintSel(r.id)} className="text-slate-400 hover:text-slate-600">
+                                {isPrintChecked
+                                  ? <FaCheckSquare className="text-base text-slate-600"/>
+                                  : <FaRegSquare className="text-base"/>
+                                }
+                              </button>
+                            ) : <FaRegSquare className="text-base text-gray-200"/>
+                          )}
                         </td>
                       )}
 
@@ -538,7 +780,7 @@ export default function Reports() {
                         <button
                           onClick={() => navigator.clipboard.writeText(genRef(r))}
                           title="Click to copy"
-                          className="font-mono text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition"
+                          className="font-mono text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition"
                         >
                           {genRef(r)}
                         </button>
@@ -590,30 +832,14 @@ export default function Reports() {
 
                       {/* Actions */}
                       <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setSelectedReport(r)}
-                            className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition"
-                          >
-                            View
-                          </button>
-                          {isPending && !batchMode && (
-                            <button
-                              onClick={() => { setSelectedIds(new Set([r.id])); setBatchDept(getAssignedDepartment(r.issueType)); setShowForwardModal(true); }}
-                              className="text-xs px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium transition flex items-center gap-1"
-                            >
-                              <FaShareSquare className="text-[9px]"/> Route
-                            </button>
-                          )}
-                          {r.status === "Resolved" && (
-                            <button
-                              onClick={() => setShowResolutionModal(r)}
-                              className="text-xs px-2.5 py-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 font-medium transition"
-                            >
-                              Resolution
-                            </button>
-                          )}
-                        </div>
+                        <ActionButtons
+                          report={r}
+                          batchMode={!!batchMode}
+                          onView={()        => setSelectedReport(r)}
+                          onPrint={()       => setReportToPrint(r)}
+                          onRoute={()       => openRouteModal(r)}
+                          onResolution={()  => setShowResolutionModal(r)}
+                        />
                       </td>
                     </tr>
                   );
@@ -632,30 +858,23 @@ export default function Reports() {
                   <h3 className="text-lg font-bold text-gray-900">Generate Report</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Select date range, department, and export format</p>
                 </div>
-                <button onClick={() => setShowReportModal(false)} className="text-gray-300 hover:text-gray-500 transition"><FaTimes/></button>
+                <button onClick={() => setShowReportModal(false)} className="text-gray-300 hover:text-gray-500"><FaTimes/></button>
               </div>
-
               <div className="px-6 py-5 space-y-5">
-
-                {/* Date range */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Start Date</label>
-                    <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={startDate} onChange={e => setStartDate(e.target.value)}/>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">End Date</label>
-                    <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={endDate} onChange={e => setEndDate(e.target.value)}/>
-                  </div>
+                  {[["Start Date", startDate, setStartDate], ["End Date", endDate, setEndDate]].map(([label, val, set]) => (
+                    <div key={label}>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{label}</label>
+                      <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={val} onChange={e => set(e.target.value)}/>
+                    </div>
+                  ))}
                 </div>
-
-                {/* Department filter */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter by Department</label>
                   <div className="grid grid-cols-2 gap-2">
                     {["All", "MENRO / WMO", "Mayor / Dispatch", "Engineering Office"].map(d => {
-                      const meta = d !== "All" ? DEPT[d] : null;
-                      const col  = meta ? DEPT_COLORS[meta.color] : null;
+                      const meta   = d !== "All" ? DEPT[d] : null;
+                      const col    = meta ? DEPT_COLORS[meta.color] : null;
                       const active = exportDept === d;
                       return (
                         <button
@@ -683,7 +902,6 @@ export default function Reports() {
                   )}
                 </div>
               </div>
-
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
                 <button onClick={() => setShowReportModal(false)} className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium">Cancel</button>
                 <div className="flex gap-2">
@@ -692,11 +910,7 @@ export default function Reports() {
                     { label:"CSV",  fn:generateCSV,  cls:"bg-emerald-500 hover:bg-emerald-600 text-white" },
                     { label:"DOCX", fn:generateDOCX, cls:"bg-blue-600 hover:bg-blue-700 text-white" },
                   ].map(({ label, fn, cls }) => (
-                    <button
-                      key={label}
-                      onClick={() => exportReports(fn)}
-                      className={`text-sm px-4 py-2 rounded-xl font-semibold transition ${cls}`}
-                    >
+                    <button key={label} onClick={() => exportReports(fn)} className={`text-sm px-4 py-2 rounded-xl font-semibold transition ${cls}`}>
                       {label}
                     </button>
                   ))}
@@ -727,6 +941,7 @@ export default function Reports() {
                   <option value="">Select new status…</option>
                   <option value="Pending">Pending</option>
                   <option value="Assigned">Assigned</option>
+                  <option value="Forwarded">Forwarded</option>
                   <option value="Withdrawn">Withdrawn</option>
                   <option value="Resolved">Resolved (opens resolution form)</option>
                 </select>
@@ -744,56 +959,115 @@ export default function Reports() {
           </div>
         )}
 
-        {/* ═══════════════ FORWARD / BATCH MODAL ═══════════════ */}
-        {showForwardModal && (
+        {/* ═══════════════ UNIFIED ROUTE MODAL ═══════════════ */}
+        {showRouteModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <FaShareSquare className="text-indigo-500 text-base"/> Route Report{selectedIds.size > 1 ? "s" : ""}
-                </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {selectedIds.size} report{selectedIds.size > 1 ? "s" : ""} will be marked <strong>Assigned</strong>
-                </p>
+            <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                    <FaShareSquare className="text-blue-500 text-sm"/>
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-medium text-gray-900">Route & transmit reports</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Assign departments, then generate official transmittals</p>
+                  </div>
+                </div>
+                <button onClick={closeRouteModal} className="text-gray-300 hover:text-gray-500 mt-0.5">
+                  <FaTimes/>
+                </button>
               </div>
-              <div className="px-6 py-5 space-y-2">
-                {["MENRO / WMO","Mayor / Dispatch","Engineering Office"].map(dept => {
-                  const d = DEPT[dept];
-                  const c = DEPT_COLORS[d.color];
-                  const active = batchDept === dept;
-                  return (
+
+              {/* Apply-to-all strip */}
+              <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Apply department to all</p>
+                <div className="flex gap-2 flex-wrap">
+                  {Object.keys(DEPT).map(dept => (
                     <button
                       key={dept}
-                      onClick={() => setBatchDept(dept)}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition text-left ${
-                        active ? `${c.badge} border-current shadow-sm` : "bg-white border-gray-100 hover:border-gray-200"
-                      }`}
+                      onClick={() => setBatchAssignments(prev =>
+                        Object.fromEntries(Object.keys(prev).map(id => [id, dept]))
+                      )}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 font-medium transition"
                     >
-                      <span className="text-xl">{d.icon}</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-800">{dept}</p>
-                        <p className="text-xs text-gray-400">{d.desc}</p>
-                      </div>
-                      {active && <FaCheckCircle className="text-green-500 shrink-0"/>}
+                      {dept}
                     </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Per-report rows */}
+              <div className="overflow-y-auto flex-1 divide-y divide-gray-50">
+                {reports.filter(r => selectedIds.has(r.id)).map(report => {
+                  const assigned = batchAssignments[report.id] || "";
+                  return (
+                    <div key={report.id} className="px-6 py-4 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800">{report.issueType || "Unknown"}</p>
+                        <p className="text-xs text-gray-400 truncate">{report.address || "No address"}</p>
+                        <p className="text-[10px] text-gray-300 font-mono mt-0.5">{genRef(report)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <select
+                          value={assigned}
+                          onChange={e => setBatchAssignments(prev => ({ ...prev, [report.id]: e.target.value }))}
+                          className={`text-xs rounded-lg px-2 py-1.5 border focus:outline-none focus:ring-2 focus:ring-indigo-200 transition ${
+                            assigned
+                              ? "border-gray-200 bg-white text-gray-800"
+                              : "border-red-200 bg-red-50 text-red-500"
+                          }`}
+                        >
+                          <option value="">— route to —</option>
+                          {Object.keys(DEPT).map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                          {assigned
+                            ? <FaCheckCircle className="text-green-400 text-sm"/>
+                            : <FaRegSquare className="text-gray-200 text-sm"/>
+                          }
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-2 justify-end">
-                <button
-                  onClick={() => { setShowForwardModal(false); if (!batchMode) { clearSel(); setBatchDept(""); } }}
-                  disabled={forwarding}
-                  className="text-sm px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition font-medium"
-                >Cancel</button>
-                <button
-                  onClick={handleBatchForward}
-                  disabled={!batchDept || forwarding}
-                  className="text-sm px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-30 transition font-semibold flex items-center gap-2"
-                >
-                  {forwarding
-                    ? <><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"/>Routing…</>
-                    : <><FaShareSquare/> Confirm Route</>}
-                </button>
+
+              {/* Validation bar */}
+              {Object.values(batchAssignments).some(d => !d) && (
+                <div className="px-6 py-2.5 bg-red-50 border-t border-red-100">
+                  <p className="text-xs text-red-500 flex items-center gap-1.5">
+                    <FaTimes className="text-[10px]"/>
+                    All reports must have a department assigned before routing.
+                  </p>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+                <span className="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-full px-3 py-1 font-medium">
+                  {Object.values(batchAssignments).filter(Boolean).length} of {Object.keys(batchAssignments).length} assigned
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={closeRouteModal}
+                    disabled={routing}
+                    className="text-sm px-4 py-2 rounded-xl text-gray-500 hover:bg-gray-100 transition font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleFinalizeBatch}
+                    disabled={routing || Object.values(batchAssignments).some(d => !d)}
+                    className="text-sm px-4 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium flex items-center gap-2"
+                  >
+                    {routing
+                      ? <><span className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"/>Routing…</>
+                      : <><FaShareSquare className="text-xs"/> Generate transmittals</>
+                    }
+                  </button>
+                </div>
               </div>
             </div>
           </div>
