@@ -1,293 +1,302 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Bar } from "react-chartjs-2";
 import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  CategoryScale,
-  LinearScale,
+  Chart as ChartJS, Title, Tooltip, Legend,
+  BarElement, CategoryScale, LinearScale,
 } from "chart.js";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point } from "@turf/helpers";
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
-export default function MonthlyReportChart() {
-  const barangays = [
-    "San Andres",
-    "Santo Domingo",
-    "San Isidro",
-    "San Juan",
-    "Santo Niño",
-    "San Roque",
-    "Santa Rosa"
-  ];
+const MONTHS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
 
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+const ISSUE_TYPES = [
+  // MENRO (Environment/Cleanliness) - Deep Forest/Teal
+  { label: "Waste Management", color: "#0f766e" }, // Deep Teal
+  
+  // Mayor / Dispatch (Hazards & Water) - Authoritative Blues & Reds
+  { label: "Drainage",         color: "#1d4ed8" }, // Deep Navy Blue (Water)
+  { label: "Road Blockage",    color: "#be123c" }, // Muted Crimson (Urgent/Stop)
+  
+  // Engineering (Asphalt, Paint, & Metal) - Industrial tones
+  { label: "Pothole",          color: "#b45309" }, // Dark Amber/Rust (Caution/Earth)
+  { label: "Road Markings",    color: "#ca8a04" }, // Traffic Gold (Paint)
+  { label: "Manhole",          color: "#334155" }, // Heavy Slate (Iron/Asphalt)
+];
 
-  // Comprehensive data for all 7 barangays across 12 months
-  const reportData = {
-    January: {
-      drainage: [120, 180, 90, 200, 150, 170, 140],
-      pothole: [140, 160, 130, 220, 210, 190, 165],
-      surface: [100, 140, 120, 180, 190, 160, 145],
-    },
-    February: {
-      drainage: [100, 160, 80, 190, 140, 155, 125],
-      pothole: [120, 150, 110, 200, 180, 170, 145],
-      surface: [90, 120, 100, 170, 160, 140, 130],
-    },
-    March: {
-      drainage: [130, 170, 100, 210, 160, 180, 155],
-      pothole: [150, 165, 120, 230, 200, 185, 170],
-      surface: [110, 130, 110, 190, 180, 150, 140],
-    },
-    April: {
-      drainage: [115, 175, 95, 205, 145, 165, 135],
-      pothole: [135, 155, 125, 215, 195, 175, 160],
-      surface: [95, 125, 105, 175, 170, 145, 135],
-    },
-    May: {
-      drainage: [125, 185, 105, 215, 155, 175, 145],
-      pothole: [145, 170, 135, 225, 205, 195, 175],
-      surface: [105, 135, 115, 185, 180, 155, 150],
-    },
-    June: {
-      drainage: [110, 165, 85, 195, 135, 160, 130],
-      pothole: [130, 145, 115, 205, 185, 165, 150],
-      surface: [85, 115, 95, 165, 155, 135, 125],
-    },
-    July: {
-      drainage: [135, 190, 110, 220, 165, 185, 160],
-      pothole: [155, 175, 140, 235, 215, 200, 180],
-      surface: [115, 145, 125, 195, 190, 165, 155],
-    },
-    August: {
-      drainage: [140, 195, 115, 225, 170, 190, 165],
-      pothole: [160, 180, 145, 240, 220, 205, 185],
-      surface: [120, 150, 130, 200, 195, 170, 160],
-    },
-    September: {
-      drainage: [105, 155, 75, 185, 125, 150, 120],
-      pothole: [125, 140, 105, 195, 175, 160, 145],
-      surface: [80, 110, 90, 160, 150, 130, 120],
-    },
-    October: {
-      drainage: [145, 200, 120, 230, 175, 195, 170],
-      pothole: [165, 185, 150, 245, 225, 210, 190],
-      surface: [125, 155, 135, 205, 200, 175, 165],
-    },
-    November: {
-      drainage: [150, 205, 125, 235, 180, 200, 175],
-      pothole: [170, 190, 155, 250, 230, 215, 195],
-      surface: [130, 160, 140, 210, 205, 180, 170],
-    },
-    December: {
-      drainage: [155, 210, 130, 240, 185, 205, 180],
-      pothole: [175, 195, 160, 255, 235, 220, 200],
-      surface: [135, 165, 145, 215, 210, 185, 175],
-    },
-  };
+// Helper to merge San Andres and Poblacion (if needed)
+const normalizeBarangay = (rawName) => {
+  if (!rawName) return "Unknown";
+  const name = rawName.trim();
+  if (/san andres/i.test(name) || /poblacion/i.test(name)) {
+    return "San Andres (Poblacion)";
+  }
+  return name;
+};
 
-  const [selectedMonth, setSelectedMonth] = useState("January");
-  const [selectedBarangays, setSelectedBarangays] = useState(barangays);
+// Updated: Now accepts the loaded GeoJSON data as a parameter
+const getBarangayFromCoords = (lat, lng, geoJsonData) => {
+  if (!lat || !lng || !geoJsonData || !geoJsonData.features) return "Unknown";
+  
+  try {
+    const targetPoint = point([lng, lat]); 
+    for (const feature of geoJsonData.features) {
+      if (booleanPointInPolygon(targetPoint, feature)) {
+        // Check standard keys used in PH GeoJSONs. 
+        // Adjust these properties if your GeoJSON uses a specific key like 'BRGY_NAME'
+        return feature.properties.name || feature.properties.NAME_4 || feature.properties.ADM4_EN || "Unknown"; 
+      }
+    }
+    return "Outside Jurisdiction"; 
+  } catch (err) {
+    console.error("Turf PIP Error:", err);
+    return "Unknown";
+  }
+};
 
-  const toggleBarangay = (barangay) => {
-    setSelectedBarangays(prev =>
-      prev.includes(barangay)
-        ? prev.filter(b => b !== barangay)
-        : [...prev, barangay]
-    );
-  };
+export default function MonthlyReportChart({ reports = [] }) {
+  const [selectedMonth, setSelectedMonth]         = useState(new Date().getMonth());
+  const [selectedTypes, setSelectedTypes]         = useState(ISSUE_TYPES.map(t => t.label));
+  const [selectedBarangays, setSelectedBarangays] = useState([]);
+  
+  // NEW: State to hold your GeoJSON data
+  const [geoJsonData, setGeoJsonData]             = useState(null);
 
-  const selectAll = () => setSelectedBarangays(barangays);
-  const clearAll = () => setSelectedBarangays([]);
+  // NEW: Fetch the GeoJSON from the public folder when the component mounts
+  useEffect(() => {
+    // Files in the public folder are accessible at the root path '/'
+    fetch('/cainta_barangays.geojson')
+      .then(res => res.json())
+      .then(data => setGeoJsonData(data))
+      .catch(err => console.error("Error loading Cainta GeoJSON:", err));
+  }, []);
 
-  // Filter data based on selected barangays
-  const getFilteredData = (dataArray) => {
-    return selectedBarangays.map(barangay => {
-      const index = barangays.indexOf(barangay);
-      return dataArray[index];
+  // Update: Only run computation if geoJsonData is loaded
+  const reportsWithAccurateLocation = useMemo(() => {
+    // If the map hasn't loaded yet, just return the raw reports temporarily
+    if (!geoJsonData) return reports.map(r => ({ ...r, _computedBarangay: "Loading..." }));
+
+    return reports.map(r => {
+      // Ensure these match your Firestore document structure!
+      const lat = r.location?.latitude || r.lat || r.latitude;
+      const lng = r.location?.longitude || r.lng || r.longitude;
+
+      const rawBarangay = getBarangayFromCoords(lat, lng, geoJsonData);
+
+      return {
+        ...r,
+        _computedBarangay: normalizeBarangay(rawBarangay)
+      };
     });
-  };
+  }, [reports, geoJsonData]);
 
-  const drainageReports = getFilteredData(reportData[selectedMonth].drainage);
-  const potholeReports = getFilteredData(reportData[selectedMonth].pothole);
-  const surfaceReports = getFilteredData(reportData[selectedMonth].surface);
+  // Derive unique barangays
+  const barangays = useMemo(() => {
+    const set = new Set(
+      reportsWithAccurateLocation
+        .map(r => r._computedBarangay)
+        .filter(b => b !== "Unknown" && b !== "Outside Jurisdiction" && b !== "Loading...")
+    );
+    return Array.from(set).sort();
+  }, [reportsWithAccurateLocation]);
 
-  const totalReports = drainageReports.map(
-    (val, i) => val + potholeReports[i] + surfaceReports[i]
-  );
+  useEffect(() => {
+    if (barangays.length > 0 && selectedBarangays.length === 0) {
+      setSelectedBarangays(barangays);
+    }
+  }, [barangays]);
 
-  const data = {
-    labels: selectedBarangays,
-    datasets: [
-      {
-        label: "Drainage",
-        data: drainageReports,
-        backgroundColor: "rgba(28, 133, 168, 0.8)",
-        borderColor: "rgba(28, 133, 168, 1)",
-        borderWidth: 1,
-      },
-      {
-        label: "Pothole",
-        data: potholeReports,
-        backgroundColor: "rgba(84, 110, 122, 0.8)",
-        borderColor: "rgba(84, 110, 122, 1)",
-        borderWidth: 1,
-      },
-      {
-        label: "Surface",
-        data: surfaceReports,
-        backgroundColor: "rgba(158, 157, 36, 0.8)",
-        borderColor: "rgba(158, 157, 36, 1)",
-        borderWidth: 1,
-      },
-      {
-        label: "Total Reports",
-        data: totalReports,
-        backgroundColor: "rgba(59, 130, 246, 0.8)",
-        borderColor: "rgba(59, 130, 246, 1)",
-        borderWidth: 1,
-      },
-    ],
-  };
+  // Build Chart Data
+  const chartData = useMemo(() => {
+    if (!selectedBarangays.length || !selectedTypes.length) {
+      return { labels: [], datasets: [] };
+    }
 
-  const options = {
+    const monthReports = reportsWithAccurateLocation.filter(r => {
+      const d = r.uploadedAt?.toDate ? r.uploadedAt.toDate() : r.uploadedAt ? new Date(r.uploadedAt) : null;
+      return d && !isNaN(d) && d.getMonth() === selectedMonth;
+    });
+
+    const datasets = ISSUE_TYPES
+      .filter(t => selectedTypes.includes(t.label))
+      .map(({ label, color }) => ({
+        label,
+        data: selectedBarangays.map(barangay =>
+          monthReports.filter(r =>
+            r.issueType === label && r._computedBarangay === barangay
+          ).length
+        ),
+        backgroundColor: color + "E6",
+        borderColor: color,
+        borderWidth: 1.5,
+        borderRadius: 4,
+        hoverBackgroundColor: color,
+      }));
+
+    return { labels: selectedBarangays, datasets };
+  }, [reportsWithAccurateLocation, selectedMonth, selectedBarangays, selectedTypes]);
+
+  // Month Total
+  const monthTotal = useMemo(() => {
+    return reports.filter(r => {
+      const d = r.uploadedAt?.toDate ? r.uploadedAt.toDate() : r.uploadedAt ? new Date(r.uploadedAt) : null;
+      return d && !isNaN(d) && d.getMonth() === selectedMonth;
+    }).length;
+  }, [reports, selectedMonth]);
+
+  // Toggles
+  const toggleBarangay = (b) => setSelectedBarangays(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
+  const toggleType = (t) => setSelectedTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+
+  const hasData = chartData.datasets.some(d => d.data.some(v => v > 0));
+
+const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
     plugins: {
-      legend: { 
+      legend: {
         position: "top",
-        labels: {
-          padding: 15,
-          font: {
-            size: 12
-          }
-        }
-      },
-      title: { 
-        display: true, 
-        text: `Barangay Reports - ${selectedMonth}`,
-        font: {
-          size: 16,
-          weight: 'bold'
+        align: "end", 
+        labels: { 
+          padding: 20, 
+          font: { size: 12, family: "'Inter', sans-serif", weight: "600" }, 
+          color: "#475569", 
+          usePointStyle: true, 
+          pointStyle: "circle",
+          boxWidth: 8
         },
-        padding: 20
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: "rgba(15, 23, 42, 0.95)", 
+        titleColor: "#f8fafc",
+        bodyColor: "#cbd5e1",
+        titleFont: { size: 13, family: "'Inter', sans-serif", weight: "bold" },
+        bodyFont:  { size: 12, family: "'Inter', sans-serif" },
         padding: 12,
-        titleFont: {
-          size: 14
+        cornerRadius: 6,
+        borderColor: "rgba(255, 255, 255, 0.1)", 
+        borderWidth: 1,
+        callbacks: {
+          footer: (items) => {
+            const sum = items.reduce((s, i) => s + i.raw, 0);
+            return sum > 0 ? `\nTotal in Area: ${sum}` : "";
+          },
         },
-        bodyFont: {
-          size: 13
-        }
-      }
+      },
     },
     scales: {
       x: { 
-        stacked: false,
-        grid: {
-          display: false
-        },
-        ticks: {
-          font: {
-            size: 11
-          }
-        }
+        border: { display: false }, 
+        grid: { 
+          display: false, 
+          drawBorder: false, 
+        }, 
+        ticks: { 
+          font: { size: 11, family: "'Inter', sans-serif", weight: "500" }, 
+          color: "#64748b",
+          padding: 8
+        } 
       },
-      y: { 
-        stacked: false, 
+      y: {
         beginAtZero: true,
-        grid: {
-          color: 'rgba(0, 0, 0, 0.05)'
+        border: { display: false }, 
+        grid: { 
+          color: "#e2e8f0", 
+          drawBorder: false,
+          tickLength: 0, 
+          borderDash: [5, 5] 
         },
-        ticks: {
-          font: {
-            size: 11
-          }
-        }
+        ticks: { 
+          font: { size: 11, family: "'Inter', sans-serif", weight: "500" }, 
+          color: "#94a3b8", 
+          precision: 0, 
+          stepSize: 1,
+          padding: 12
+        },
       },
     },
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-        <h2 className="text-xl font-bold text-gray-800">Monthly Report Chart</h2>
-        
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-600">Month:</label>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
-          >
-            {months.map((month) => (
-              <option key={month} value={month}>
-                {month}
-              </option>
+    <div className="space-y-5">
+      
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 tracking-tight">Incident Volume by Barangay</h2>
+          <p className="text-xs font-medium text-gray-500 mt-0.5">
+            {MONTHS[selectedMonth]} Overview — <span className="text-blue-600 font-bold">{monthTotal}</span> total logs
+          </p>
+        </div>
+        <select
+          value={selectedMonth}
+          onChange={e => setSelectedMonth(Number(e.target.value))}
+          className="text-sm font-semibold border border-gray-200 rounded-lg px-4 py-2 bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+        >
+          {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+        </select>
+      </div>
+
+      {/* ── Barangay Filter ── */}
+      {barangays.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Barangay Filter</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedBarangays(barangays)}
+                className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+              >Select All</button>
+              <button
+                onClick={() => setSelectedBarangays([])}
+                className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+              >Clear</button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {barangays.map(b => (
+              <button
+                key={b}
+                onClick={() => toggleBarangay(b)}
+                className={`text-xs px-3 py-1.5 rounded-md transition font-semibold border ${
+                  selectedBarangays.includes(b)
+                    ? "bg-slate-800 text-white border-slate-800 shadow-sm"
+                    : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                {b}
+              </button>
             ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Barangay Filter */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700">Filter by Barangay</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={selectAll}
-              className="text-xs px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-            >
-              Select All
-            </button>
-            <button
-              onClick={clearAll}
-              className="text-xs px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
-            >
-              Clear All
-            </button>
           </div>
         </div>
-        
-        <div className="flex flex-wrap gap-2">
-          {barangays.map((barangay) => (
-            <button
-              key={barangay}
-              onClick={() => toggleBarangay(barangay)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                selectedBarangays.includes(barangay)
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-300'
-              }`}
-            >
-              {barangay}
-            </button>
-          ))}
-        </div>
-        
-        {selectedBarangays.length === 0 && (
-          <p className="text-sm text-red-500 mt-3">Please select at least one barangay to display data.</p>
-        )}
-      </div>
+      )}
 
-      {/* Chart */}
-      <div className="h-96">
-        {selectedBarangays.length > 0 ? (
-          <Bar data={data} options={options} />
+      {/* ── Chart Area ── */}
+      <div className="h-[300px] mt-2">
+        {selectedBarangays.length > 0 && selectedTypes.length > 0 && hasData ? (
+          <Bar data={chartData} options={chartOptions} />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            <p>No barangays selected</p>
+          <div className="h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 text-gray-400">
+            {selectedBarangays.length === 0 || selectedTypes.length === 0 ? (
+              <p className="text-sm font-semibold text-gray-500">Select at least one territory and issue type</p>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-gray-500">No incident logs found for {MONTHS[selectedMonth]}</p>
+                <p className="text-xs mt-1 text-gray-400">Try adjusting your filters or selecting a different month.</p>
+              </>
+            )}
           </div>
         )}
       </div>
+      
     </div>
   );
 }
