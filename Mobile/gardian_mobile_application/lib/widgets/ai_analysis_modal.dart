@@ -161,51 +161,83 @@ class AIAnalysisModal {
 
     String interpretation = "Status: $status. ";
 
-    if (issueType == "Drainage" && blockagePercent != null) {
-      interpretation +=
-          "Calculated blockage severity is ${blockagePercent.toStringAsFixed(1)}%. ";
-      if (blockagePercent >= 50.0) {
+    if (issueType == "Drainage") {
+      // Drainage relies heavily on the calculated percentage from the backend
+      if (blockagePercent != null) {
         interpretation +=
-            "This severe obstruction highly restricts water flow and poses a significant flooding risk.";
-      } else if (blockagePercent >= 10.0) {
-        interpretation +=
-            "Debris is partially restricting water flow, reducing overall drainage efficiency.";
-      } else if (blockagePercent > 0) {
-        interpretation +=
-            "Minor debris detected, but water flow remains largely unaffected.";
+            "Calculated blockage severity is ${blockagePercent.toStringAsFixed(1)}%. ";
+        if (blockagePercent >= 50.0) {
+          interpretation +=
+              "This severe obstruction highly restricts water flow and poses a significant flooding risk.";
+        } else if (blockagePercent >= 10.0) {
+          interpretation +=
+              "Debris is partially restricting water flow, reducing overall drainage efficiency.";
+        } else if (blockagePercent > 0) {
+          interpretation +=
+              "Minor debris detected, but water flow remains largely unaffected.";
+        }
       }
     } else if (issueType == "Pothole") {
       int potholeCount =
-          classCounts["pothole"] ?? classCounts["potholes"] ?? boxes.length;
+          (classCounts["pothole"] ?? 0) + (classCounts["potholes"] ?? 0);
+      if (potholeCount == 0) potholeCount = boxes.length; // Fallback
       interpretation +=
           "Detected $potholeCount pothole(s) requiring patching to prevent vehicle damage.";
     } else if (issueType == "Manhole") {
       int broken = classCounts["broken_manhole"] ?? 0;
       int intact = classCounts["intact_manhole"] ?? 0;
+      int generic =
+          (classCounts["manhole"] ?? 0) + (classCounts["manholes"] ?? 0);
+
       if (broken > 0) {
         interpretation +=
             "Identified $broken broken manhole(s) posing an immediate safety hazard.";
-      } else if (intact > 0) {
+      } else if (intact > 0 || generic > 0) {
+        int total = intact + generic;
         interpretation +=
-            "Manhole cover(s) appear structurally intact. Flagged for documentation.";
+            "Detected $total manhole cover(s). Flagged for documentation and regular inspection.";
       }
     } else if (issueType == "Road Markings" || issueType == "Roadmarkings") {
       int faded = classCounts["faded_crosswalk"] ?? 0;
       int intact = classCounts["intact_crosswalk"] ?? 0;
+      int generic = classCounts["crosswalk"] ?? 0;
+
       if (faded > 0) {
         interpretation +=
             "Detected $faded faded marking(s) requiring repainting to ensure visibility.";
-      } else if (intact > 0) {
+      } else if (intact > 0 || generic > 0) {
         interpretation += "Road markings appear intact and highly visible.";
       }
     } else if (issueType == "Road Blockage") {
-      int vehicleCount = classCounts["vehicle"] ?? 0;
+      // Create a list of all possible vehicle classes returned by your YOLO backend
+      const blockageTypes = [
+        "vehicle",
+        "bike",
+        "bus",
+        "car",
+        "e-bike",
+        "e-jeepney",
+        "e-tricycle",
+        "jeepney",
+        "motorcycle",
+        "semi-truck",
+        "trycle",
+        "truck",
+      ];
+
+      int vehicleCount = 0;
+      for (String type in blockageTypes) {
+        vehicleCount += classCounts[type] ?? 0;
+      }
+
       if (vehicleCount > 0) {
         interpretation +=
-            "Detected $vehicleCount vehicle(s) potentially causing an unauthorized road blockage or obstruction.";
+            "Detected $vehicleCount vehicle(s) or object(s) potentially causing an unauthorized road blockage or obstruction.";
       }
     } else if (issueType == "Waste Management") {
-      int trashCount = classCounts["trash"] ?? 0;
+      // Sum both "trash" and "garbage" classes
+      int trashCount =
+          (classCounts["trash"] ?? 0) + (classCounts["garbage"] ?? 0);
       if (trashCount > 0) {
         interpretation +=
             "Identified $trashCount instance(s) of uncollected waste or illegal dumping requiring cleanup.";

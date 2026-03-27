@@ -18,16 +18,17 @@ class _HomePageState extends State<HomePage> {
   final List<String> _typeFilters = [
     "All",
     "Drainage",
+    "Waste Management",
     "Pothole",
     "Manhole",
     "Road Markings",
-    "Waste Management",
     "Road Blockage",
   ];
   final List<String> _statusFilters = [
     "Pending",
     "Assigned",
     "Resolved",
+    "Forwarded",
     "Withdrawn",
   ];
 

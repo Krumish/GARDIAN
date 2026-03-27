@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../onboarding_page.dart';
+import 'admin_settings_page.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -46,6 +47,7 @@ class AboutPage extends StatelessWidget {
                       height: 120,
                     ),
                   ),
+
                   const SizedBox(height: 20),
                   const Text(
                     "GARDIAN",
@@ -116,9 +118,19 @@ class AboutPage extends StatelessWidget {
               name: "Jan Maverick Cayabyab",
               role: "Researcher & Developer",
             ),
-            _buildPersonCard(
-              name: "Miguel Joshua Galope",
-              role: "Researcher & Developer",
+            GestureDetector(
+              onLongPress: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminSettingsPage(),
+                  ),
+                );
+              },
+              child: _buildPersonCard(
+                name: "Miguel Joshua Galope",
+                role: "Researcher & Developer",
+              ),
             ),
             _buildPersonCard(
               name: "Allen Audrey Kish Leyble",

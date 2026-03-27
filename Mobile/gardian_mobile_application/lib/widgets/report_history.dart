@@ -42,16 +42,17 @@ class ReportHistory extends StatelessWidget {
 
           final activeTypes = selectedFilters.intersection({
             "Drainage",
+            "Waste Management",
             "Pothole",
             "Manhole",
             "Road Markings",
-            "Waste Management",
             "Road Blockage",
           });
           final activeStatuses = selectedFilters.intersection({
             "Pending",
             "Assigned",
             "Resolved",
+            "Forwarded",
             "Withdrawn",
           });
 
@@ -156,6 +157,10 @@ class _ReportCardState extends State<_ReportCard>
       case "Assigned":
         statusColor = Colors.indigo.shade600;
         statusIcon = Icons.assignment_ind_rounded;
+        break;
+      case "Forwarded":
+        statusColor = Colors.tealAccent.shade700;
+        statusIcon = Icons.arrow_forward_rounded;
         break;
       case "Withdrawn":
         statusColor = Colors.grey.shade600;
