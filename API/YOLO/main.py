@@ -15,12 +15,12 @@ models = {}
 def load_models():
     global models
     print("Loading YOLO models...")
-    models["Drainage"] = YOLO("drainage_v9.pt")  
+    models["Drainage"] = YOLO("drainage_v10.pt")  
     models["Pothole"] = YOLO("pothole_v2.pt")
     models["Manhole"] = YOLO("manhole_v2.pt")
     models["Road Markings"] = YOLO("marking_v2.pt")    
-    models["Road Blockage"] = YOLO("road_block_v1.pt")
-    models["Waste Management"] = YOLO("trash_v1.pt")
+    models["Road Blockage"] = YOLO("road_block_v3.pt")
+    models["Waste Management"] = YOLO("trash_v3.pt")
     print(f"Models loaded: {list(models.keys())}")
 
 def box_area(box):
@@ -46,12 +46,12 @@ EXPECTED_CLASSES = {
     "Pothole": ["pothole", "potholes"], 
     "Manhole": ["manhole", "manholes", "broken_manhole", "intact_manhole"],
     "Road Markings": ["crosswalk", "faded_crosswalk", "intact_crosswalk"],
-    "Road Blockage": ["vehicle"],
-    "Waste Management": ["trash"]
+    "Road Blockage": ["vehicle", "bike", "bus", "car", "e-bike", "e-jeepney", "e-tricycle", "jeepney", "motorcycle", "semi-truck", "trycle", "truck"],
+    "Waste Management": ["trash", "garbage"]
 }
 
 @app.post("/detect/")
-async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
+async def detect(file: UploadFile = File(...), issue_type: str = Form(...), conf: float = Form(0.25)):
     if issue_type not in models:
         return JSONResponse({"error": f"Invalid issue_type: {issue_type}"}, status_code=400)
 
@@ -62,7 +62,7 @@ async def detect(file: UploadFile = File(...), issue_type: str = Form(...)):
         with open(temp_name, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        results = model(temp_name, conf=0.25, iou=0.45)
+        results = model(temp_name, conf=conf, iou=0.45)
         
         annotated_image = results[0].plot(conf=False, labels=True, boxes=True)
         
