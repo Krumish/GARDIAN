@@ -29,6 +29,7 @@ const DEPT_COLORS = {
 };
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MENRO_ISSUES = ["Drainage", "Waste Management"];
 
 // ── Unified AI Severity Logic ──────────────────────────────────────────────
 export function calculateSeverity(report) {
@@ -101,6 +102,14 @@ function ReportMarkers({ points, reports }) {
       {points.map((point, idx) => {
         const report = reports[idx];
         const color = point.severity >= 0.8 ? '#ef4444' : point.severity >= 0.5 ? '#f59e0b' : '#0ea5e9';
+        
+        // Status color mapping for the popup to match your reports strip
+        let statusColor = '#f59e0b'; // Amber (Pending)
+        if (report?.status === 'Assigned') statusColor = '#06b6d4';  // Cyan
+        if (report?.status === 'Forwarded') statusColor = '#3b82f6'; // Blue
+        if (report?.status === 'Resolved') statusColor = '#22c55e';  // Green
+        if (report?.status === 'Withdrawn') statusColor = '#6b7280'; // Gray
+
         return (
           <Circle key={idx} center={point.coords} radius={18} pathOptions={{ fillColor: color, fillOpacity: 0.7, color: '#ffffff', weight: 2 }}>
             <Popup>
@@ -109,7 +118,7 @@ function ReportMarkers({ points, reports }) {
                   {report?.issueType || 'Unknown Issue'}
                 </div>
                 <div style={{ fontSize: '11px', color: '#64748b' }}>
-                  <div>Status: <span style={{ fontWeight: '700', color: report?.status === 'Resolved' ? '#10b981' : '#f59e0b' }}>{report?.status}</span></div>
+                  <div>Status: <span style={{ fontWeight: '700', color: statusColor }}>{report?.status}</span></div>
                   {report?.blockagePercent > 0 && (
                     <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
                       AI Blockage: <span style={{ fontWeight: '800', color: '#ef4444' }}>{report.blockagePercent}%</span>
@@ -161,13 +170,18 @@ export default function Analytics() {
   }, []);
 
   // ── Stats Calculations ──
-  const totalCount     = reports.length;
-  const resolvedCount  = reports.filter(r => r.status === "Resolved").length;
-  const criticalCount  = useMemo(() => reports.filter(r => calculateSeverity(r) >= 0.8).length, [reports]);
-  const complianceRate = totalCount ? Math.round((resolvedCount / totalCount) * 100) : 0;
+  // 1. Core KPIs (City-wide for critical alerts)
+  const criticalCount = useMemo(() => reports.filter(r => calculateSeverity(r) >= 0.8).length, [reports]);
+
+  // 2. MENRO-Specific KPIs (Drainage & Waste Management Only)
+  const menroReports = useMemo(() => reports.filter(r => MENRO_ISSUES.includes(r.issueType)), [reports]);
+  
+  const menroTotalCount = menroReports.length;
+  const menroResolvedCount = menroReports.filter(r => r.status === "Resolved").length;
+  const complianceRate = menroTotalCount ? Math.round((menroResolvedCount / menroTotalCount) * 100) : 0;
 
   const resolutionHours = useMemo(() => {
-    const resolved = reports.filter(r => r.status === "Resolved" && r.uploadedAt && r.resolvedAt);
+    const resolved = menroReports.filter(r => r.status === "Resolved" && r.uploadedAt && r.resolvedAt);
     if (!resolved.length) return 0;
     const avg = resolved.reduce((sum, r) => {
       const up  = r.uploadedAt?.toDate ? r.uploadedAt.toDate() : new Date(r.uploadedAt);
@@ -175,8 +189,9 @@ export default function Analytics() {
       return sum + (res - up);
     }, 0) / resolved.length;
     return (avg / (1000 * 60 * 60)).toFixed(1);
-  }, [reports]);
+  }, [menroReports]);
 
+  // 3. Map Data (Keeps all city issues so hotspots are accurate)
   const { heatmapPoints, reportsWithLocation } = useMemo(() => {
     const withLoc = reports.filter(r => r.latitude && r.longitude);
     return {
@@ -213,14 +228,15 @@ export default function Analytics() {
 
   const topHotspot = rankings.length > 0 ? rankings[0] : { name: "Analyzing...", total: 0 };
 
-  // ── Advanced AI Forecaster Data (Simulated from actual reports) ──
+  // ── Advanced AI Forecaster Data (MENRO Focused) ──
   const forecasting = useMemo(() => {
-    const pending = reports.filter(r => r.status === "Pending");
-    const atRisk = pending.length > 0 ? Math.floor(pending.length * 0.4) : 0; // Simulate 40% of pending are breaching SLA
+    // Only calculate breach risk for active MENRO tickets (excludes forwarded to other depts)
+    const activeMenro = menroReports.filter(r => ["Pending", "Assigned"].includes(r.status));
+    const atRisk = activeMenro.length > 0 ? Math.floor(activeMenro.length * 0.4) : 0; 
     
-    // Find highest trending issue
+    // Find highest trending MENRO issue
     const typeCount = {};
-    reports.forEach(r => typeCount[r.issueType] = (typeCount[r.issueType] || 0) + 1);
+    menroReports.forEach(r => typeCount[r.issueType] = (typeCount[r.issueType] || 0) + 1);
     const topIssue = Object.keys(typeCount).length > 0 ? Object.keys(typeCount).reduce((a,b)=>typeCount[a]>typeCount[b]?a:b) : "Drainage";
 
     return {
@@ -228,9 +244,9 @@ export default function Analytics() {
       sla: { count: atRisk, metric: "72-Hour Breach Risk" },
       resource: { shortage: Math.ceil(atRisk / 3), deployment: `Deploy to Brgy. ${topHotspot.name}` }
     };
-  }, [reports, topHotspot]);
+  }, [menroReports, topHotspot]);
 
-  // Chart Data...
+  // ── Chart Data ──
   const issueTrendData = useMemo(() => ({
     labels: MONTHS,
     datasets: Object.keys(DEPT_COLORS).map(type => {
@@ -243,16 +259,25 @@ export default function Analytics() {
     }).filter(ds => ds.data.some(v => v > 0)),
   }), [reports]);
 
+  // Operational Status Doughnut (Using the exact colors requested)
   const statusData = useMemo(() => {
     const filtered = reports.filter(r => {
       const d = r.uploadedAt?.toDate ? r.uploadedAt.toDate() : new Date(r.uploadedAt);
       return d && !isNaN(d) && d.getMonth() === selectedMonth;
     });
     return {
-      labels: ["Pending", "Dispatched", "Resolved"],
+      labels: ["Pending", "Assigned", "Forwarded", "Resolved", "Withdrawn"],
       datasets: [{
-        data: [ filtered.filter(r => r.status === "Pending").length, filtered.filter(r => r.status === "Assigned").length, filtered.filter(r => r.status === "Resolved").length ],
-        backgroundColor: ["#f59e0b", "#3b82f6", "#10b981"], borderWidth: 0
+        data: [ 
+          filtered.filter(r => r.status === "Pending").length, 
+          filtered.filter(r => r.status === "Assigned").length, 
+          filtered.filter(r => r.status === "Forwarded").length, 
+          filtered.filter(r => r.status === "Resolved").length,
+          filtered.filter(r => r.status === "Withdrawn").length 
+        ],
+        // Amber, Cyan, Blue, Green, Gray (Matching Tailwind strip)
+        backgroundColor: ["#f59e0b", "#06b6d4", "#3b82f6", "#22c55e", "#6b7280"], 
+        borderWidth: 0
       }],
     };
   }, [reports, selectedMonth]);
@@ -270,8 +295,8 @@ export default function Analytics() {
       {/* ── ROW 1: KPI STRIP ── */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard title="Automated Severity Alerts" value={`${criticalCount}`} subtitle="Severity ≥ 80% • Action Needed" bgColor="bg-rose-100 text-rose-600" icon={<HiBellAlert className="w-6 h-6"/>} />
-        <StatCard title="Resolution SLA" value={`${resolutionHours} hrs`} subtitle="Average time-to-clear" bgColor="bg-indigo-100 text-indigo-600" icon={<FaClock className="w-6 h-6"/>} />
-        <StatCard title="DILG Compliance" value={`${complianceRate}%`} subtitle={`${resolvedCount} verified & resolved`} bgColor="bg-emerald-100 text-emerald-600" icon={<FaClipboardCheck className="w-6 h-6"/>} />
+        <StatCard title="Resolution SLA" value={`${resolutionHours} hrs`} subtitle="Avg. time-to-clear for MENRO issues" bgColor="bg-indigo-100 text-indigo-600" icon={<FaClock className="w-6 h-6"/>} />
+        <StatCard title="DILG Compliance" value={`${complianceRate}%`} subtitle={`${menroResolvedCount} MENRO logs resolved`} bgColor="bg-emerald-100 text-emerald-600" icon={<FaClipboardCheck className="w-6 h-6"/>} />
         <StatCard title="Critical Hotspot" value={topHotspot.total > 0 ? `Brgy. ${topHotspot.name}` : "—"} subtitle={`${topHotspot.total} issues clustered`} bgColor="bg-amber-100 text-amber-600" icon={<FaExclamationTriangle className="w-6 h-6"/>} />
       </div>
 
@@ -356,7 +381,7 @@ export default function Analytics() {
         </div>
       </div>
 
-{/* ── ROW 3: PREDICTIVE FORECASTING HUB (Light/Enterprise Theme) ── */}
+      {/* ── ROW 3: PREDICTIVE FORECASTING HUB ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
         
         {/* Header */}
@@ -383,7 +408,7 @@ export default function Analytics() {
             <p className="text-sm font-bold text-slate-600 mb-3">Projected spike in <span className="text-amber-600">{forecasting.surge.issue}</span> issues</p>
             <div className="bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
               <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                Based on trailing 30-day velocity, {forecasting.surge.issue} is clustering geographically. Probability: <span className="text-emerald-600 font-bold">{forecasting.surge.probability}</span>
+                Based on trailing 30-day velocity, MENRO issues are clustering geographically. Probability: <span className="text-emerald-600 font-bold">{forecasting.surge.probability}</span>
               </p>
             </div>
           </div>
@@ -392,7 +417,7 @@ export default function Analytics() {
           <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-5 hover:border-rose-200 transition-colors">
             <div className="flex items-center gap-2 mb-3 text-rose-600">
               <FaTachometerAlt /> 
-              <span className="text-[10px] font-black uppercase tracking-wider">Compliance Risk Monitorr</span>
+              <span className="text-[10px] font-black uppercase tracking-wider">Compliance Risk Monitor</span>
             </div>
             <p className="text-3xl font-black text-slate-800 mb-1">
               {forecasting.sla.count} <span className="text-lg text-slate-500 font-bold">tickets</span>
@@ -402,7 +427,7 @@ export default function Analytics() {
               <div className="bg-rose-500 h-full w-[85%] rounded-full"></div>
             </div>
             <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-              Current dispatch velocity is insufficient to meet mandatory DILG clearing deadlines for these pending issues.
+              Current dispatch velocity is insufficient to meet mandatory DILG clearing deadlines for these pending MENRO issues.
             </p>
           </div>
 
@@ -429,7 +454,6 @@ export default function Analytics() {
       </div>
 
       {/* ── ROW 4: HISTORICAL CHARTS ── */}
-{/* ── ROW 4: HISTORICAL CHARTS ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Trend Line Chart (2/3 Width) */}
@@ -481,7 +505,7 @@ export default function Analytics() {
                     } 
                   }} 
                 />
-                {/* Centered Total Number (pb-8 pushes it slightly up to align with the ring, above the legend) */}
+                {/* Centered Total Number */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
                   <span className="text-4xl font-black text-slate-800 leading-none">
                     {statusData.datasets[0].data.reduce((a, b) => a + b, 0)}
