@@ -53,7 +53,7 @@ const generateReadableAISummary = (report) => {
 };
 
 const PrintableReport = forwardRef(({ reports }, ref) => (
-  <div ref={ref} style={{ padding:"20px", fontFamily:"Arial, sans-serif", color:"#000", background:"#fff" }}>
+  <div ref={ref} style={{ padding:"20px", fontFamily:'"Times New Roman", Times, serif', color:"#000", background:"#fff" }}>
     <style type="text/css" media="print">{`
       @page { size: letter; margin: 0.5in; }
       .page-break { page-break-after: always; }
@@ -62,34 +62,41 @@ const PrintableReport = forwardRef(({ reports }, ref) => (
     `}</style>
 
     {reports.map((report, idx) => (
-      <div key={report.id} className={`report-container${idx !== reports.length - 1 ? " page-break" : ""}`}>
+      <div 
+        key={report.id} 
+        className={`report-container${idx !== reports.length - 1 ? " page-break" : ""}`} 
+        style={{ paddingBottom: "20px" }} // Added buffer to prevent sliced signatures
+      >
 
-        {/* Header */}
-        <div style={{ textAlign:"center", borderBottom:"3px solid #000", paddingBottom:"10px", marginBottom:"15px" }}>
-          <h1 style={{ fontSize:"20px", fontWeight:"900", textTransform:"uppercase", margin:"0 0 4px 0" }}>Municipality of Cainta</h1>
-          <h2 style={{ fontSize:"15px", fontWeight:"bold", margin:"0 0 4px 0", color:"#333" }}>Municipal Environment & Natural Resources Office (MENRO)</h2>
-          <p style={{ fontSize:"12px", fontStyle:"italic", margin:0, color:"#555" }}>GARDIAN System — Official Incident Transmittal Brief</p>
+        {/* LGU Official Header */}
+        <div style={{ textAlign:"center", marginBottom:"12px" }}> {/* Reduced margin to fit 1 page */}
+          <p style={{ fontSize:"11px", margin:"0" }}>Republic of the Philippines</p>
+          <p style={{ fontSize:"11px", margin:"0" }}>Province of Rizal</p>
+          <h1 style={{ fontSize:"14px", fontWeight:"bold", margin:"4px 0" }}>MUNICIPALITY OF CAINTA</h1>
+          <h2 style={{ fontSize:"12px", fontWeight:"bold", margin:"0 0 6px 0" }}>OFFICE OF THE MUNICIPAL ENVIRONMENT AND NATURAL RESOURCES</h2>
+          <div style={{ borderTop:"2px solid #000", margin:"0 auto 8px auto" }} />
+          <h3 style={{ fontSize:"14px", fontWeight:"bold", textTransform:"uppercase", margin:0 }}>Official Incident Transmittal Brief</h3>
         </div>
 
         {/* Meta row */}
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"15px", fontSize:"13px", backgroundColor:"#f4f4f4", padding:"12px", border:"1px solid #ccc" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"12px", fontSize:"12px", border:"1px solid #000", padding:"10px 12px" }}>
           <div>
-            <p style={{ margin:"0 0 5px 0" }}><strong>Reference Code:</strong> <span style={{ fontFamily:"monospace", fontSize:"14px" }}>{genRef(report.id, report.uploadedAt)}</span></p>
+            <p style={{ margin:"0 0 5px 0" }}><strong>Control No.:</strong> <span style={{ fontFamily:"monospace", fontSize:"13px" }}>{genRef(report.id, report.uploadedAt)}</span></p>
             <p style={{ margin:"0 0 5px 0" }}><strong>Date Logged:</strong> {fmtDate(report.uploadedAt)}</p>
-            <p style={{ margin:0 }}><strong>Current Status:</strong> <span style={{ fontWeight:"bold", textTransform:"uppercase" }}>{report.status}</span></p>
+            <p style={{ margin:0 }}><strong>Current Status:</strong> <span style={{ fontWeight:"bold", textTransform:"uppercase" }}>{report.status || "PENDING"}</span></p>
           </div>
           <div style={{ textAlign:"right" }}>
             <p style={{ margin:"0 0 5px 0" }}><strong>Routed Department:</strong> {report.assignedDepartment || "Pending Routing"}</p>
-            <p style={{ margin:0 }}><strong>Issue Category:</strong> <span style={{ fontWeight:"bold", textTransform:"uppercase" }}>{report.issueType}</span></p>
+            <p style={{ margin:0 }}><strong>Incident Category:</strong> <span style={{ fontWeight:"bold", textTransform:"uppercase" }}>{report.issueType}</span></p>
           </div>
         </div>
 
         {/* Section 1 — Incident & Location */}
-        <div style={{ marginBottom:"15px" }}>
-          <h3 style={{ fontSize:"13px", fontWeight:"bold", backgroundColor:"#333", color:"#fff", padding:"6px 10px", margin:"0 0 8px 0", textTransform:"uppercase" }}>
-            1. Incident & Location
+        <div style={{ marginBottom:"12px" }}>
+          <h3 style={{ fontSize:"12px", fontWeight:"bold", backgroundColor:"#E6E6E6", border:"1px solid #000", color:"#000", padding:"4px 10px", margin:"0 0 6px 0", textTransform:"uppercase" }}>
+            I. Incident & Location Details
           </h3>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13px", border:"1px solid #ccc" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"12px", border:"1px solid #000" }}>
             <tbody>
               {[
                 ["Reporter Name:", `${report.userDetails?.firstName || ""} ${report.userDetails?.lastName || ""}`.trim() || "—"],
@@ -97,8 +104,8 @@ const PrintableReport = forwardRef(({ reports }, ref) => (
                 ["Citizen's Note:", `"${report.description || report.note || "No description provided."}"`],
               ].map(([label, val], i) => (
                 <tr key={i}>
-                  <td style={{ padding:"8px", borderBottom: i < 2 ? "1px solid #ccc" : "none", borderRight:"1px solid #ccc", fontWeight:"bold", width:"150px", backgroundColor:"#f9f9f9" }}>{label}</td>
-                  <td style={{ padding:"8px", borderBottom: i < 2 ? "1px solid #ccc" : "none", fontStyle: i === 2 ? "italic" : "normal", color: i === 2 ? "#333" : "#000" }}>{val}</td>
+                  <td style={{ padding:"6px", borderBottom: i < 2 ? "1px solid #000" : "none", borderRight:"1px solid #000", fontWeight:"bold", width:"150px", backgroundColor:"#F9F9F9" }}>{label}</td>
+                  <td style={{ padding:"6px", borderBottom: i < 2 ? "1px solid #000" : "none", fontStyle: i === 2 ? "italic" : "normal" }}>{val}</td>
                 </tr>
               ))}
             </tbody>
@@ -106,12 +113,12 @@ const PrintableReport = forwardRef(({ reports }, ref) => (
         </div>
 
         {/* Section 2 — AI Assessment */}
-        <div style={{ marginBottom:"15px" }}>
-          <h3 style={{ fontSize:"13px", fontWeight:"bold", backgroundColor:"#333", color:"#fff", padding:"6px 10px", margin:"0 0 8px 0", textTransform:"uppercase" }}>
-            2. AI Automated Assessment
+        <div style={{ marginBottom:"12px" }}>
+          <h3 style={{ fontSize:"12px", fontWeight:"bold", backgroundColor:"#E6E6E6", border:"1px solid #000", color:"#000", padding:"4px 10px", margin:"0 0 6px 0", textTransform:"uppercase" }}>
+            II. AI Automated Assessment
           </h3>
-          <div style={{ padding:"12px", backgroundColor:"#f9f9f9", border:"1px solid #ccc" }}>
-            <p style={{ margin:0, fontSize:"13px", lineHeight:"1.5" }}>
+          <div style={{ padding:"8px 12px", border:"1px solid #000" }}>
+            <p style={{ margin:0, fontSize:"12px", lineHeight:"1.4" }}>
               <strong>Automated Brief:</strong> {generateReadableAISummary(report)}
             </p>
           </div>
@@ -119,21 +126,22 @@ const PrintableReport = forwardRef(({ reports }, ref) => (
 
         {/* Section 3 — Visual Evidence */}
         {(report.url || report.annotatedUrl) && (
-          <div style={{ marginBottom:"20px" }}>
-            <h3 style={{ fontSize:"13px", fontWeight:"bold", backgroundColor:"#333", color:"#fff", padding:"6px 10px", margin:"0 0 8px 0", textTransform:"uppercase" }}>
-              3. Visual Evidence
+          <div style={{ marginBottom:"12px" }}>
+            <h3 style={{ fontSize:"12px", fontWeight:"bold", backgroundColor:"#E6E6E6", border:"1px solid #000", color:"#000", padding:"4px 10px", margin:"0 0 6px 0", textTransform:"uppercase" }}>
+              III. Visual Evidence Attachment
             </h3>
             <div style={{ display:"flex", gap:"15px", justifyContent:"center" }}>
               {report.url && (
-                <div style={{ flex:1, textAlign:"center", border:"1px solid #999", padding:"4px", backgroundColor:"#fafafa" }}>
-                  <p style={{ margin:"0 0 4px 0", fontSize:"11px", fontWeight:"bold", color:"#333", letterSpacing:"1px" }}>ORIGINAL UPLOAD</p>
-                  <img src={report.url} alt="Original" style={{ height:"220px", width:"100%", objectFit:"contain", border:"1px solid #eee" }}/>
+                <div style={{ flex:1, textAlign:"center", border:"1px solid #000", padding:"4px" }}>
+                  <p style={{ margin:"0 0 4px 0", fontSize:"10px", fontWeight:"bold", letterSpacing:"1px", textTransform:"uppercase" }}>Original Upload</p>
+                  {/* Reduced image height from 220px to 170px to guarantee 1-page fit */}
+                  <img crossOrigin="anonymous" src={report.url} alt="Original" style={{ height:"170px", width:"100%", objectFit:"contain", border:"1px solid #ccc" }}/>
                 </div>
               )}
               {report.annotatedUrl && (
-                <div style={{ flex:1, textAlign:"center", border:"1px solid #555", padding:"4px", backgroundColor:"#f0f0f0" }}>
-                  <p style={{ margin:"0 0 4px 0", fontSize:"11px", fontWeight:"bold", color:"#000", letterSpacing:"1px" }}>AI DETECTION MAPPING</p>
-                  <img src={report.annotatedUrl} alt="AI Annotated" style={{ height:"220px", width:"100%", objectFit:"contain", border:"1px solid #ccc" }}/>
+                <div style={{ flex:1, textAlign:"center", border:"1px solid #000", padding:"4px" }}>
+                  <p style={{ margin:"0 0 4px 0", fontSize:"10px", fontWeight:"bold", letterSpacing:"1px", textTransform:"uppercase" }}>AI Detection Mapping</p>
+                  <img crossOrigin="anonymous" src={report.annotatedUrl} alt="AI Annotated" style={{ height:"170px", width:"100%", objectFit:"contain", border:"1px solid #ccc" }}/>
                 </div>
               )}
             </div>
@@ -141,12 +149,16 @@ const PrintableReport = forwardRef(({ reports }, ref) => (
         )}
 
         {/* Signature block */}
-        <div style={{ marginTop:"30px", display:"flex", justifyContent:"space-between", paddingTop:"10px" }}>
-          {[["Verified By (MENRO Data Hub)","Signature over printed name"], ["Received By Action Team","Signature over printed name & Date"]].map(([title, sub]) => (
-            <div key={title} style={{ textAlign:"center", width:"40%" }}>
-              <div style={{ borderBottom:"1px solid #000", height:"25px", marginBottom:"5px" }}/>
-              <p style={{ fontSize:"12px", fontWeight:"bold", margin:0 }}>{title}</p>
-              <p style={{ fontSize:"10px", margin:0, color:"#555" }}>{sub}</p>
+        <div style={{ marginTop:"20px", display:"flex", justifyContent:"space-between", paddingTop:"10px" }}> {/* Reduced marginTop */}
+          {[
+            ["Prepared by:", "GARDIAN System Administrator", "Signature over printed name"], 
+            ["Received by Action Team:", "Department / Office Representative", "Signature over printed name & Date"]
+          ].map(([title, role, sub]) => (
+            <div key={title} style={{ width:"45%" }}>
+              <p style={{ fontSize:"12px", margin:"0 0 20px 0" }}>{title}</p>
+              <div style={{ borderBottom:"1px solid #000", height:"1px", marginBottom:"5px" }}/>
+              <p style={{ fontSize:"11px", fontWeight:"bold", margin:0, textTransform:"uppercase" }}>{role}</p>
+              <p style={{ fontSize:"10px", margin:0 }}>{sub}</p>
             </div>
           ))}
         </div>
