@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
   import ReportDetailsModal     from './ReportDetailsModal';
   import ResolutionDetailsModal from './ResolutionDetailsModal';
   import ResolveReportModal     from './ResolveReportModal';
-  import PrintableReport        from "./printablereport";
+  import PrintableReport        from "./PrintableReport";
   import { generatePDF, generateCSV, generateDOCX } from './ReportGenerate';
   import { useReactToPrint } from "react-to-print";
   
@@ -506,41 +506,39 @@ import { useState, useEffect, useRef } from "react";
         return;
       }
 
-      // Call the generator — it must return a Blob (update ReportGenerate.js if needed)
-      let blob;
-      try {
-        blob = await generatorFn(toExport, startDate, endDate);
-      } catch (genErr) {
-        console.error("[Reports] Export generation failed:", genErr);
-        alert("Failed to generate the report file.");
-        return;
-      }
+      // Call the generator
+let fileData;
+try {
+  fileData = await generatorFn(toExport, startDate, endDate);
+} catch (genErr) {
+  console.error("[Reports] Export generation failed:", genErr);
+  alert("Failed to generate the report file.");
+  return;
+}
 
-      setShowReportModal(false);
+setShowReportModal(false);
 
-      if (!sendEmailOnExport) return; // user opted out
+if (!sendEmailOnExport) return;
 
-      setSendingEmail(true);
-      try {
-        const ext      = { pdf:"pdf", csv:"csv", docx:"docx" }[triggerType] || triggerType;
-        const filename = `GARDIAN_Report_${exportDept.replace(/\s*\/\s*/g,"-")}_${new Date().toISOString().slice(0,10)}.${ext}`;
+setSendingEmail(true);
+try {
+  await sendExportEmail({
+    blob: fileData.blob,
+    filename: fileData.filename,
+    department: exportDept,
+    reports: toExport,
+    triggerType,
+    deptEmailsMap: deptEmails,
+    generatedBy: adminName(),
+  });
 
-        await sendExportEmail({
-          blob,
-          filename,
-          department:    exportDept,
-          reports:       toExport,
-          triggerType,
-          deptEmailsMap: deptEmails,
-          generatedBy:   adminName(),
-        });
-        alert(`✅ Report emailed to ${exportDept}.`);
-      } catch (emailErr) {
-        console.error("[Reports] Export email failed:", emailErr);
-        alert("Report was generated but the email failed. Check the console for details.");
-      } finally {
-        setSendingEmail(false);
-      }
+  alert(`✅ Report emailed to ${exportDept}.`);
+} catch (emailErr) {
+  console.error("[Reports] Export email failed:", emailErr);
+  alert("Report was generated but the email failed. Check the console for details.");
+} finally {
+  setSendingEmail(false);
+}
     };
 
     // ── Status update ─────────────────────────────────────────────────────────

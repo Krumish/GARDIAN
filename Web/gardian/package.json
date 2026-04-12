@@ -16,6 +16,7 @@
     "@turf/turf": "^7.3.4",
     "chart.js": "^4.5.0",
     "firebase": "^12.4.0",
+    "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
