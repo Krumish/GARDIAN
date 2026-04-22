@@ -443,10 +443,12 @@ const ReportDetailsModal = ({ selectedReport, onClose, formatDate, formatTime })
   const hasYolo = !!yolo && (yolo.status || (yolo.boxes && yolo.boxes.length > 0));
 
   const getStatusColor = (status) => ({
-    'Pending':     'bg-amber-50 text-amber-800 border-amber-200',
-    'Assigned':'bg-blue-50 text-blue-800 border-blue-200',
-    'Resolved':    'bg-emerald-50 text-emerald-800 border-emerald-200',
-  }[status] || 'bg-gray-50 text-gray-800 border-gray-200');
+    'Pending':   'bg-amber-50  text-amber-800  border-amber-200',
+    'Assigned':  'bg-cyan-50   text-cyan-800   border-cyan-200',
+    'Forwarded': 'bg-blue-50   text-blue-800   border-blue-200',
+    'Resolved':  'bg-green-50  text-green-800  border-green-200',
+    'Withdrawn': 'bg-gray-50   text-gray-600   border-gray-200',
+  }[status] || 'bg-slate-50 text-slate-800 border-slate-200');
 
   const getIssueTypeIcon = (type) => ({
     'Drainage':       <FaWater className="text-2xl text-blue-600" />,
